@@ -1,0 +1,27 @@
+.top-bar{
+    &__container{
+        display: flex;
+        padding: 10px 20px;
+        gap:10px;
+        position: fixed;
+        width: 100%;
+        background: #FFF;
+        align-items: center;
+        z-index: 1;
+        top:0;
+        box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.25);
+    }
+
+    &__logo{
+        width: 30px;
+        height: 30px;
+    }
+
+    &__text{
+        @extend .title;
+    }
+}
+
+body{
+    padding-top: 50px;
+}

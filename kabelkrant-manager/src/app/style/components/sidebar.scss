@@ -1,0 +1,19 @@
+.sidebar{
+
+    &__container{
+        background: white;
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+        gap:10px;
+        align-items: left;
+        width: 300px;
+        box-sizing: border-box;
+        height: calc(100dvh - 50px);
+        max-width: 300px;
+    }
+
+    &__header{
+        @extend .header;
+    }
+}

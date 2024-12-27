@@ -1,0 +1,27 @@
+.sidebar-item{
+
+    &__container{
+        @extend .text;
+        padding: 10px;
+        background: $light-grey;
+        border-radius: 10px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 5px;
+        transition: color 0.2s, background-color 0.2s;
+
+        &--selected{
+            color: white;
+            background: $accent;
+        }
+    }
+
+    &__add-icon{
+        height: 20px;
+        width: 20px;
+    }
+    
+
+}
