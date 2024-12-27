@@ -2,12 +2,13 @@ name: App deploy
 
 on:
   push:
-    branches: 
+    branches:
       - main
 env:
   APP_FOLDER: kabelkrant-manager
+  SENTRY_AUTH_TOKEN: ${{secrets.SENTRY_AUTH_TOKEN}}
 
-jobs: 
+jobs:
   deploy-application:
     runs-on: windows-latest
     steps:

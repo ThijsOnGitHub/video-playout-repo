@@ -22,6 +22,6 @@ export default defineConfig({
 
   plugins: [sentryVitePlugin({
     org: "thijs-r2",
-    project: "electron"
+    project: "kabelkrant-player"
   })]
 });
