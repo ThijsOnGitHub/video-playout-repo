@@ -1,11 +1,11 @@
-import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { VitePlugin } from '@electron-forge/plugin-vite';
+import type { ForgeConfig } from '@electron-forge/shared-types';
 
 
 const config: ForgeConfig = {
   packagerConfig: {
-    icon : './assets/logo.ico',
+    icon: './assets/logo.ico',
   },
   makers: [new MakerSquirrel({
     setupIcon: './assets/logo.ico',
@@ -18,7 +18,7 @@ const config: ForgeConfig = {
           owner: 'ThijsOnGitHub',
           name: 'video-playout-repo'
         },
-        prerelease: true
+        draft: false
       }
     }
   ],
