@@ -15,6 +15,7 @@ if (require('electron-squirrel-startup')) {
 }
 
 
+
 Sentry.init({
   dsn: "https://b58b86c9be4a5903b5351d03f3891c50@o4508110447181824.ingest.de.sentry.io/4508540528296016",
 });
