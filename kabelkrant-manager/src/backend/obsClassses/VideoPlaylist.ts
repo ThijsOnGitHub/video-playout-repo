@@ -1,14 +1,15 @@
-import { Playout } from './Playout';
 import * as Sentry from "@sentry/electron/main";
+import { logging } from "../logging";
+import { Playout } from './Playout';
 
 export class VideoPlaylist {
     public videos: string[] = [];
-    public currentPlayoutIndex: number = 0;
-    public inSwitch: boolean = false;
+    public currentPlayoutIndex = 0;
+    public inSwitch = false;
 
     constructor(
-        public playFirstVideo: (videoPath: string, playout: Playout, shouldFade:boolean) => Promise<void>,
-        public clearVideoPlayer: (data: {inputName: string}) => Promise<void>,
+        public playFirstVideo: (videoPath: string, playout: Playout, shouldFade: boolean) => Promise<void>,
+        public clearVideoPlayer: (data: { inputName: string }) => Promise<void>,
         public prepairVideo: (videoPath: string, playout: Playout) => Promise<void>,
         public checkIfVideoPlays: (playout: Playout) => Promise<boolean>,
         public playListEmpty: () => Promise<void>,
@@ -17,10 +18,10 @@ export class VideoPlaylist {
         setInterval(async () => {
             // Check if video is playing when the playlist is not empty 
             console.log("Check if video is playing")
-            if(this.videos.length > 0 && !this.inSwitch){
+            if (this.videos.length > 0 && !this.inSwitch) {
                 const isPlaying = await checkIfVideoPlays(this.getCurrentPlayout())
-                if(!isPlaying){
-                    Sentry.captureMessage('Video is not playing',{
+                if (!isPlaying) {
+                    Sentry.captureMessage('Video is not playing', {
                         extra: {
                             playout: this.getCurrentPlayout(),
                             videos: this.videos,
@@ -28,7 +29,7 @@ export class VideoPlaylist {
                             playouts: this.playouts
                         }
                     })
-                    this.playNextVideo({inputName: this.getCurrentPlayout().videoSource})
+                    this.playNextVideo({ inputName: this.getCurrentPlayout().videoSource })
                 }
             }
         }, 1000 /* * 60 * 5*/);
@@ -57,26 +58,26 @@ export class VideoPlaylist {
             this.videos.push(...videoPath);
             if (oldLength == 0) {
                 await this.prepairVideo(videoPath[0], this.getCurrentPlayout())
-                await this.playFirstVideo(videoPath[0],this.getCurrentPlayout(), true);
+                await this.playFirstVideo(videoPath[0], this.getCurrentPlayout(), true);
             }
             console.log("Playing videos", this.videos)
-            if(this.videos.length > 1 && oldLength < 2){
+            if (this.videos.length > 1 && oldLength < 2) {
                 await this.prepairVideo(this.videos[1], this.getNextPlayout())
             }
-        } catch(e) {
+        } catch (e) {
             console.error(e)
             Sentry.captureException(e)
         }
         this.inSwitch = false;
     }
 
-    async playNextVideo(data: {inputName: string}) {
+    async playNextVideo(data: { inputName: string }) {
         // Check if it is not an video that stoped in the preview
         this.inSwitch = true;
-        try{
-            if(data.inputName != this.getCurrentPlayout().videoSource) return;
+        try {
+            if (data.inputName != this.getCurrentPlayout().videoSource) return;
             this.videos.shift();
-            console.log("Playing videos - video's after shift", this.videos)
+            logging.log('info', "Playing videos - video's after shift ", this.videos)
             if (this.videos.length == 0) {
                 await this.clearVideoPlayer(data);
                 this.playListEmpty();
@@ -85,11 +86,11 @@ export class VideoPlaylist {
             this.setNextPlayout();
             console.log("Playing videos", this.videos)
             await this.playFirstVideo(this.videos[0], this.getCurrentPlayout(), false);
-            await this.clearVideoPlayer({inputName: this.getNextPlayout().videoSource});
+            await this.clearVideoPlayer({ inputName: this.getNextPlayout().videoSource });
             if (this.videos.length > 1) {
                 await this.prepairVideo(this.videos[1], this.getNextPlayout())
             }
-        } catch(e) {
+        } catch (e) {
             console.error(e)
             Sentry.captureException(e)
         }
@@ -98,7 +99,7 @@ export class VideoPlaylist {
 
     removeItemsFromPlaylist() {
         this.videos = [];
-        this.clearVideoPlayer({inputName:this.getCurrentPlayout().videoSource} )
-        this.clearVideoPlayer({inputName:this.getNextPlayout().videoSource})
+        this.clearVideoPlayer({ inputName: this.getCurrentPlayout().videoSource })
+        this.clearVideoPlayer({ inputName: this.getNextPlayout().videoSource })
     }
 }

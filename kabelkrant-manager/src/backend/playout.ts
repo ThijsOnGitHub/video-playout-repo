@@ -1,25 +1,24 @@
+import * as Sentry from '@sentry/electron';
 import { getDay, isAfter, isBefore, subSeconds } from 'date-fns';
 import fs from 'fs';
 import * as NodeCron from 'node-cron';
 import path from 'path';
-import { sortFilesWithNumbers } from '../global/sortFunction.js';
-import { VideoItem, VideoItems } from '../global/types/VideoItem.js';
-import { videoPlaylist } from './obsManager.js';
-
-
-const jsonFolder = path.join(__dirname, '../json');
-//const programPath = path.join(jsonFolder, '/program.json');
-//const hasPlayedPath = path.join(jsonFolder, '/hasPlayed.json');
-//const VIDEOS_FILE_PATH = path.join(__dirname, '../video');
+import { sortFilesWithNumbers } from '../global/sortFunction';
+import { VideoItem, VideoItems } from '../global/types/VideoItem';
+import { logging } from './logging';
+import { videoPlaylist } from './obsManager';
 
 export function startCron(programFilePath: string, hasPlayedPath: string) {
     NodeCron.schedule('* * * * * *', () => {
-        // log the current time
-        console.log("Running a task every 5 minutes", new Date().toLocaleTimeString());
         try {
             checkIfVideoMustPlay(programFilePath, hasPlayedPath)
         } catch (e) {
-            console.log("error", e)
+            logging.log({
+                level: 'error',
+                message: `Error in cron job: ${e.message}`,
+                stack: e.stack
+            })
+            Sentry.captureException(e)
         }
     })
 
@@ -79,15 +78,16 @@ function shouldVideoPlay(video: VideoItem, currentDay: number, currentDate: Date
 }
 
 export function playVideoItem(hasPlayedPath: string, videoItem: VideoItem) {
-    console.log("play video", videoItem)
+    logging.log('info', `Video item prepair to play`, videoItem)
     let videos = fs.readdirSync(videoItem.path)
         .sort(sortFilesWithNumbers)
         .map(file => path.join(videoItem.path, file))
+
     if (videos.length == 0) return
     if (!videoItem.playAll) {
         videos = [getSingleVideoPath(videos, hasPlayedPath, videoItem)]
     }
-    console.log("play videos", videos)
+    logging.log('info', `The following video's will be added to the playlist`, videos)
     videoPlaylist.addVideos(videos)
 }
 

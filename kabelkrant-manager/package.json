@@ -95,6 +95,8 @@
     "update-electron-app": "^3.0.0",
     "utf-8-validate": "^5.0.10",
     "uuid": "^9.0.1",
-    "vite": "^4.4.5"
+    "vite": "^4.4.5",
+    "winston": "^3.17.0",
+    "winston-daily-rotate-file": "^5.0.0"
   }
 }
