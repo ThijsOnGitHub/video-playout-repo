@@ -16,7 +16,7 @@ const config: ForgeConfig = {
       config: {
         repository: {
           owner: 'ThijsOnGitHub',
-          name: 'kabelkrant'
+          name: 'video-playout-repo'
         },
         prerelease: true
       }
