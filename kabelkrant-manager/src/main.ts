@@ -1,11 +1,11 @@
-import { app, BrowserWindow, Menu, nativeImage, Tray } from 'electron';
-import path from 'path';
-import { startPlayoutServer } from './obs';
-import { handleEvents } from './obs/events/functionHandler';
-import { updateElectronApp } from 'update-electron-app';
-import logo from './images/logo.png'
-import fs from 'fs';
 import * as Sentry from "@sentry/electron/main";
+import { app, BrowserWindow, Menu, nativeImage, Tray } from 'electron';
+import fs from 'fs';
+import path from 'path';
+import { updateElectronApp } from 'update-electron-app';
+import { startPlayoutServer } from './backend';
+import { handleEvents } from './backend/events/functionHandler';
+import logo from './images/logo.png';
 import { startServer } from './server/server';
 updateElectronApp();
 
@@ -45,7 +45,7 @@ const openWindow = () => {
 
 
   // open devtools only when in dev mode
-  
+
 
   // Open the DevTools.
 };
@@ -65,9 +65,9 @@ if (!gotTheLock) {
 // Some APIs can only be used after this event occurs.
 
 export const programJSONPath = path.join(app.getPath("userData"), "settings.json")
-export const hasPlayedJSONPath = path.join(app.getPath("userData"), "hasPlayed.json") 
+export const hasPlayedJSONPath = path.join(app.getPath("userData"), "hasPlayed.json")
 
-function prepairTray(){
+function prepairTray() {
   const iconPath = path.join(__dirname, "../../src/images/logo-kabelkrant-manager.png")
   const icon = nativeImage.createFromPath(iconPath)
   tray = new Tray(icon)
@@ -81,11 +81,11 @@ function prepairTray(){
   tray.setToolTip("Kabelkrant Manager")
 }
 
-function createFiles(){
-  if (!fs.existsSync(programJSONPath)){
+function createFiles() {
+  if (!fs.existsSync(programJSONPath)) {
     fs.writeFileSync(programJSONPath, JSON.stringify([]))
   }
-  if (!fs.existsSync(hasPlayedJSONPath)){
+  if (!fs.existsSync(hasPlayedJSONPath)) {
     fs.writeFileSync(hasPlayedJSONPath, JSON.stringify([]))
   }
 }
@@ -106,7 +106,7 @@ app.whenReady().then(() => {
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    
+
   }
 });
 
