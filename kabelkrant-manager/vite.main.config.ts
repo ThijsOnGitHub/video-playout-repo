@@ -22,6 +22,7 @@ export default defineConfig({
 
   plugins: [sentryVitePlugin({
     org: "thijs-europe",
-    project: "kabelkrant-player"
+    project: "kabelkrant-player",
+    disable: process.env.NODE_ENV !== "production",
   })]
 });
