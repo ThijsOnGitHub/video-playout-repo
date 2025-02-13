@@ -21,7 +21,7 @@ export class VideoPlaylist {
             if (this.videos.length > 0 && !this.inSwitch) {
                 const isPlaying = await checkIfVideoPlays(this.getCurrentPlayout())
                 if (!isPlaying) {
-                    Sentry.captureMessage('Video is not playing', {
+                    Sentry.captureException('Video is not playing', {
                         extra: {
                             playout: this.getCurrentPlayout(),
                             videos: this.videos,
