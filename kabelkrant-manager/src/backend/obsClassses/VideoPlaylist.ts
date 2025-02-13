@@ -98,6 +98,7 @@ export class VideoPlaylist {
     }
 
     removeItemsFromPlaylist() {
+        logging.log('info', "Remove items from playlist")
         this.videos = [];
         this.clearVideoPlayer({ inputName: this.getCurrentPlayout().videoSource })
         this.clearVideoPlayer({ inputName: this.getNextPlayout().videoSource })

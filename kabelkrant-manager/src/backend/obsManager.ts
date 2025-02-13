@@ -68,10 +68,12 @@ export async function startObsConnector() {
     });
 
     obs.on('MediaInputPlaybackEnded', async (data) => {
+        logging.log('info', 'Media input playback ended', data)
         videoPlaylist.playNextVideo(data)
     })
 
     obs.on('CurrentProgramSceneChanged', async (data) => {
+        logging.log('info', 'Current program scene changed', data)
         if (Playout.some(playout => playout.sceneName.toLowerCase() == data.sceneName.toLowerCase())) {
             return
         }
@@ -99,7 +101,7 @@ export namespace ObsPlayer {
     }
 
     export async function clearVideoPlayer(data: { inputName: string }) {
-        logging.info('Clear video player')
+        logging.info(`Clear video player ${data.inputName}`)
         await obs.call("SetInputSettings", {
             inputName: data.inputName,
             inputSettings: {
@@ -110,7 +112,7 @@ export namespace ObsPlayer {
 
 
     export async function fadeVolume(sourceName: string, duration: number, buildUp: boolean) {
-        log(`Fade volume ${sourceName} ${buildUp ? "up" : "down"} in ${duration}ms on ${sourceName}`)
+        log(`Fade volume ${sourceName} ${buildUp ? "up" : "down"} in ${duration}ms on ${sourceName} started`)
         for (let i = 1; i < 11; i++) {
 
             await wait(duration / 10)
@@ -119,10 +121,11 @@ export namespace ObsPlayer {
                 inputVolumeMul: buildUp ? i / 10 : 1 - i / 10
             })
         }
+        log(`Fade volume ${sourceName} ${buildUp ? "up" : "down"} in ${duration}ms on ${sourceName} eneded`)
     }
 
     export async function prepairVideo(filePath: string, playout: Playout) {
-        log(`Prepair video ${filePath} on ${playout.videoSource} in ${playout.sceneName}`)
+        log(`Prepair video ${filePath} on ${playout.videoSource} in ${playout.sceneName} started`)
 
         await obs.call("SetStudioModeEnabled", {
             studioModeEnabled: true
@@ -191,6 +194,7 @@ export namespace ObsPlayer {
             inputName: playout.videoSource,
             mediaAction: "OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP",
         })
+        log(`Prepair video ${filePath} on ${playout.videoSource} in ${playout.sceneName} ended`)
     }
 
     export async function playVideo(filePath: string, playout: Playout, shouldFadeMusic = true) {
