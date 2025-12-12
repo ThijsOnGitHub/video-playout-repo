@@ -7,6 +7,7 @@ import { v4 } from 'uuid'
 import { Pages } from './consts/pages'
 import { Programs } from './page/Programs'
 import { Playlist } from './page/Playlist'
+import { Agenda } from './page/Agenda'
 
 function App() {
   const [programs, setPrograms] = useState<ProgrammaFormSchema[]>([])
@@ -92,6 +93,11 @@ function App() {
       text: "Speelt nu af",
       isSelected: page == Pages.CURRENT_PLAYLIST,
       onClick: () => setPage(Pages.CURRENT_PLAYLIST)
+    },{
+      type: SidebarItemTypes.BUTTON,
+      text: "Agenda",
+      isSelected: page == Pages.AGENDA,
+      onClick: () => setPage(Pages.AGENDA)
     }]
   }), [programs, selectedIndex, page ])
 
@@ -106,6 +112,7 @@ function App() {
         <div className='mt-5 flex-1 bg-white px-5 py-2 rounded-md'>
           {page == Pages.PROGRAMS && <Programs selectedItem={selectedItem} programs={programs} selectedIndex={selectedIndex} setPrograms={setPrograms} />}
           {page == Pages.CURRENT_PLAYLIST && <Playlist/>}
+          {page == Pages.AGENDA && <Agenda programs={programs}/>}
         </div>
       </div>
 
