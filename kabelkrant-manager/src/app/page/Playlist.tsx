@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { FileVideo } from "lucide-react";
 import { FC, useEffect, useState } from "react";
+import { apiClient } from "../lib/apiClient";
 
 
 
@@ -13,7 +14,7 @@ export const Playlist: FC<PlaylistProps> = () => {
     const [playlist, setPlaylist] = useState<string[]>([])
 
     async function updatePlaylist(){
-        const playlist = await window.electronApi.getPlaylist()
+        const playlist = await apiClient.getPlaylist()
         setPlaylist(playlist)
     }
 

@@ -16,6 +16,7 @@ import { Command, CommandGroup, CommandItem, CommandList } from "../ui/command"
 import { formatDuration } from "../../function/formatDuration"
 import { sortFilesWithNumbers } from  "../../../global/sortFunction"
 import { ConfirmDialog } from "../ConfirmDialog/ConfirmDialog"
+import { apiClient } from "../../lib/apiClient"
 
 export interface ProgramFormProps {
     value: ProgrammaFormSchema
@@ -36,7 +37,7 @@ export const ProgramForm: React.FC<ProgramFormProps> = ({ value, onSubmit }) => 
     }, [value])
 
     async function getFiles() {
-        const files = await window.electronApi.getFilesInFolder(watch().path)
+        const files = await apiClient.getFilesInFolder(watch().path)
         setFilesWithMetadata(files.sort((a,b) => sortFilesWithNumbers(a.name, b.name)))
     }
 
@@ -57,7 +58,7 @@ export const ProgramForm: React.FC<ProgramFormProps> = ({ value, onSubmit }) => 
     const width = 130
 
     async function selectFolder() {
-        setValue("path", await window.electronApi.selectFolder())
+        setValue("path", await apiClient.selectFolder())
     }
 
     return (
@@ -168,7 +169,7 @@ export const ProgramForm: React.FC<ProgramFormProps> = ({ value, onSubmit }) => 
                     </CommandGroup>
                 </CommandList>
             </Command>
-            <ConfirmDialog buttonText="Nu afspelen op TV" onConfirm={() => window.electronApi.playVideoItem(value)} />
+            <ConfirmDialog buttonText="Nu afspelen op TV" onConfirm={() => apiClient.playVideoItem(value)} />
         </div>
     )
 }

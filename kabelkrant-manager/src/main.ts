@@ -6,7 +6,7 @@ import { updateElectronApp } from 'update-electron-app';
 import { startPlayoutServer } from './backend';
 import { handleEvents } from './backend/events/functionHandler';
 import logo from './images/logo.png';
-import { startServer } from './server/server';
+import { startApiServer } from './api/server';
 updateElectronApp();
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -95,7 +95,15 @@ function createFiles() {
 app.whenReady().then(() => {
   createFiles()
   startPlayoutServer(programJSONPath, hasPlayedJSONPath)
-  startServer(programJSONPath)
+
+  // Start the API server for both IPC and HTTP access
+  startApiServer({
+    port: 3002,
+    programFilePath: programJSONPath,
+    hasPlayedJSONPath: hasPlayedJSONPath,
+    enableCors: true
+  })
+
   prepairTray()
   handleEvents(hasPlayedJSONPath)
   openWindow()
