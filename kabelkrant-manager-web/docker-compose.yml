@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  kabelkrant-manager:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persist settings and play history
+      - ./data:/app/data
+      # Mount video files (read-only)
+      - /path/to/your/videos:/videos:ro
+    environment:
+      - OBS_WEBSOCKET_URL=ws://host.docker.internal:4455
+      - OBS_WEBSOCKET_PASSWORD=rtvserver
+      - VIDEO_BASE_PATH=/videos
+      - DATA_PATH=/app/data
+      - PORT=3000
+    extra_hosts:
+      # For accessing OBS on the host machine
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

@@ -1,0 +1,34 @@
+# Dependencies
+node_modules
+
+# Build output
+.output
+dist
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Data (contains user settings)
+data/
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# TanStack Router generated files
+src/routeTree.gen.ts
+
+# Videos
+/videos
