@@ -2,12 +2,14 @@ import { ObsManager } from "./services/obsManager";
 import { VideoPlaylist } from "./services/videoPlaylist";
 import { PlayoutEngine } from "./services/playoutEngine";
 import { getFileStorage, FileStorage } from "./services/fileStorage";
+import { getBrowserPlayout, BrowserPlayout } from "./services/browserPlayout";
 
 export interface KabelkrantServices {
   storage: FileStorage;
   obsManager: ObsManager;
   videoPlaylist: VideoPlaylist;
   playoutEngine: PlayoutEngine;
+  browserPlayout: BrowserPlayout;
 }
 
 // Store services in globalThis to persist across HMR
@@ -22,7 +24,11 @@ async function createServices(): Promise<KabelkrantServices> {
   const storage = getFileStorage();
   const obsManager = new ObsManager();
   const videoPlaylist = new VideoPlaylist(obsManager);
+  const browserPlayout = getBrowserPlayout();
   const playoutEngine = new PlayoutEngine(storage, videoPlaylist);
+
+  // Connect browser playout to engine
+  playoutEngine.setBrowserPlayout(browserPlayout);
 
   // Wire up OBS events
   obsManager.on("mediaEnded", (data) => videoPlaylist.playNextVideo(data));
@@ -34,11 +40,14 @@ async function createServices(): Promise<KabelkrantServices> {
   });
 
   // Start background processes
-  await obsManager.startConnectionLoop();
+  const settings = storage.getPlayoutSettings();
+  if (settings.playoutMode === "obs") {
+    await obsManager.startConnectionLoop();
+  }
   playoutEngine.startCron();
 
   console.log("[Server] Services started");
-  return { storage, obsManager, videoPlaylist, playoutEngine };
+  return { storage, obsManager, videoPlaylist, playoutEngine, browserPlayout };
 }
 
 function stopServices(services: KabelkrantServices): void {
@@ -46,6 +55,7 @@ function stopServices(services: KabelkrantServices): void {
   services.playoutEngine.cleanup();
   services.videoPlaylist.cleanup();
   services.obsManager.cleanup();
+  services.browserPlayout.cleanup();
 }
 
 // Singleton initialization

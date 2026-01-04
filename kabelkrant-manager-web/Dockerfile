@@ -1,13 +1,13 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci
+# Install all dependencies (including dev for build)
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -16,15 +16,15 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
 # Create data directory
 RUN mkdir -p /app/data
 
-# Copy built application
-COPY --from=builder /app/.output .output
+# Copy built application (Nitro outputs to .output/)
+COPY --from=builder /app/.output ./.output
 COPY --from=builder /app/package.json .
 
 # Set environment variables
@@ -38,5 +38,5 @@ ENV PORT=3000
 # Expose the port
 EXPOSE 3000
 
-# Start the server
+# Start the server with Nitro
 CMD ["node", ".output/server/index.mjs"]

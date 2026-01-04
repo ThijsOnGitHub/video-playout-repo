@@ -1,18 +1,18 @@
-import { createContext, useContext } from 'react'
-import type { ProgramFormSchema } from '@/lib/schemas/program'
+import { createContext, useContext } from "react";
+import type { VideoItem } from "@/lib/types/VideoItem";
 
 interface ProgramsContextValue {
-  programs: ProgramFormSchema[]
-  setPrograms: (programs: ProgramFormSchema[]) => void
-  selectedIndex: number
+  programs: VideoItem[];
+  setPrograms: (programs: VideoItem[]) => void;
+  selectedIndex: number;
 }
 
-export const ProgramsContext = createContext<ProgramsContextValue | null>(null)
+export const ProgramsContext = createContext<ProgramsContextValue | null>(null);
 
 export function useProgramsContext() {
-  const context = useContext(ProgramsContext)
+  const context = useContext(ProgramsContext);
   if (!context) {
-    throw new Error('useProgramsContext must be used within a ProgramsContext.Provider')
+    throw new Error("useProgramsContext must be used within a ProgramsContext.Provider");
   }
-  return context
+  return context;
 }

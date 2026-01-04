@@ -1,4 +1,4 @@
-import { getDay, isAfter, isBefore, subSeconds } from "date-fns";
+import { getDay, isAfter, isBefore, subSeconds, parseISO } from "date-fns";
 import fs from "fs";
 import path from "path";
 import * as NodeCron from "node-cron";
@@ -6,14 +6,39 @@ import type { VideoItem } from "@/lib/types/VideoItem";
 import { sortFilesWithNumbers } from "@/lib/sortFunction";
 import type { FileStorage } from "./fileStorage";
 import type { VideoPlaylist } from "./videoPlaylist";
+import type { BrowserPlayout } from "./browserPlayout";
+import type { ScheduledDate } from "@/lib/schemas/program";
+
+const VIDEO_EXTENSIONS = [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"];
+
+export interface PlayoutTarget {
+  addVideos(videos: string[]): Promise<void>;
+}
 
 export class PlayoutEngine {
   private cronJob: NodeCron.ScheduledTask | null = null;
+  private browserPlayout: BrowserPlayout | null = null;
 
   constructor(
     private storage: FileStorage,
     private videoPlaylist: VideoPlaylist
   ) {}
+
+  setBrowserPlayout(browserPlayout: BrowserPlayout): void {
+    this.browserPlayout = browserPlayout;
+    console.log("[PlayoutEngine] BrowserPlayout set");
+  }
+
+  private getActivePlayoutTarget(): PlayoutTarget {
+    const settings = this.storage.getPlayoutSettings();
+    console.log("[PlayoutEngine] getActivePlayoutTarget - mode:", settings.playoutMode, "hasBrowserPlayout:", !!this.browserPlayout);
+    if (settings.playoutMode === "browser" && this.browserPlayout) {
+      console.log("[PlayoutEngine] Using BrowserPlayout, connected clients:", this.browserPlayout.getClientCount());
+      return this.browserPlayout;
+    }
+    console.log("[PlayoutEngine] Using VideoPlaylist (OBS)");
+    return this.videoPlaylist;
+  }
 
   startCron() {
     this.cronJob = NodeCron.schedule("* * * * * *", () => {
@@ -55,10 +80,29 @@ export class PlayoutEngine {
   }
 
   private shouldVideoPlay(video: VideoItem, currentDay: number, currentDate: Date, prevCheckDate: Date): boolean {
+    // Check scheduled dates (specific date + time)
+    if (video.scheduledDates && video.scheduledDates.length > 0) {
+      const scheduledMatch = this.shouldScheduledDatePlay(video.scheduledDates, currentDate, prevCheckDate);
+      if (scheduledMatch) {
+        return true;
+      }
+    }
+
+    // Check regular planning (day of week + times)
     return video.planning.some((planning) => {
       const sameDay = planning.days.some((day) => day === currentDay);
       const sameTime = planning.times.some((time) => this.isTimeInTimeRange(time, currentDate, prevCheckDate));
       return sameDay && sameTime;
+    });
+  }
+
+  private shouldScheduledDatePlay(scheduledDates: ScheduledDate[], currentDate: Date, prevCheckDate: Date): boolean {
+    return scheduledDates.some((scheduled) => {
+      // Parse the ISO dateTime string
+      const scheduledDateTime = parseISO(scheduled.dateTime);
+
+      // Check if the scheduled time falls within the check window (between prevCheckDate and currentDate)
+      return isBefore(scheduledDateTime, currentDate) && isAfter(scheduledDateTime, prevCheckDate);
     });
   }
 
@@ -79,6 +123,11 @@ export class PlayoutEngine {
     return selectedFile.filePath;
   }
 
+  private isVideoFile(fileName: string): boolean {
+    const extension = path.extname(fileName).toLowerCase();
+    return VIDEO_EXTENSIONS.includes(extension);
+  }
+
   playVideoItem(videoItem: VideoItem) {
     console.log("Video item prepare to play", videoItem, process.env.VIDEO_BASE_PATH ?? "undefined");
 
@@ -92,9 +141,15 @@ export class PlayoutEngine {
       return;
     }
 
-    const fileNames = fs.readdirSync(fullPath).sort(sortFilesWithNumbers);
+    const fileNames = fs
+      .readdirSync(fullPath)
+      .filter((file) => this.isVideoFile(file))
+      .sort(sortFilesWithNumbers);
 
-    if (fileNames.length === 0) return;
+    if (fileNames.length === 0) {
+      console.error("No video files found in folder", fullPath);
+      return;
+    }
 
     let videos: string[];
     if (!videoItem.playAll) {
@@ -104,10 +159,12 @@ export class PlayoutEngine {
     }
 
     console.log("The following video's will be added to the playlist", videos);
-    this.videoPlaylist.addVideos(videos);
+    const target = this.getActivePlayoutTarget();
+    target.addVideos(videos);
   }
 
   getPlaylist(): string[] {
+    // Return OBS playlist for backwards compatibility
     return this.videoPlaylist.videos;
   }
 
