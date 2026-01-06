@@ -59,7 +59,7 @@ export class PlayoutEngine {
   }
 
   private checkIfVideoMustPlay() {
-    //console.log("[PlayoutEngine] Checking if video must play...");
+    console.log("[PlayoutEngine] Checking if video must play");
     const videos = this.storage.getPrograms();
     const now = new Date();
     const start = subSeconds(now, 1);

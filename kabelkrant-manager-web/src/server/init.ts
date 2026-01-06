@@ -12,10 +12,15 @@ export interface KabelkrantServices {
   browserPlayout: BrowserPlayout;
 }
 
+// Unique ID for this code version - changes when code is reloaded
+const CODE_VERSION = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
 // Store services in globalThis to persist across HMR
 declare global {
   // eslint-disable-next-line no-var
   var __kabelkrant_services: KabelkrantServices | undefined;
+  // eslint-disable-next-line no-var
+  var __kabelkrant_code_version: string | undefined;
 }
 
 async function createServices(): Promise<KabelkrantServices> {
@@ -64,10 +69,10 @@ let initPromise: Promise<KabelkrantServices> | null = null;
 
 
 export async function initializeServer(): Promise<KabelkrantServices> {
-  console.log("[Server] Initializing server...");
   if (globalThis.__kabelkrant_services) {
     return globalThis.__kabelkrant_services;
   }
+  console.log("[Server] Initializing new server...");
 
   if (!initPromise) {
     initPromise = createServices().then((services) => {
@@ -87,16 +92,21 @@ export function getServices(): KabelkrantServices {
   return globalThis.__kabelkrant_services;
 }
 
-console.log("[Server] Module loaded", import.meta.url);
+// Check if this is a new code version (code changed) vs just a re-import
+const isCodeChange = globalThis.__kabelkrant_code_version !== CODE_VERSION;
+if (isCodeChange) {
+  console.log(`[Server] New code version: ${CODE_VERSION} (previous: ${globalThis.__kabelkrant_code_version || "none"})`);
+  globalThis.__kabelkrant_code_version = CODE_VERSION;
+  
+  // Only restart services if there were existing services (code changed, not first load)
+  if (globalThis.__kabelkrant_services) {
+    console.log("[Server] Code changed - restarting services...");
+    stopServices(globalThis.__kabelkrant_services);
+    globalThis.__kabelkrant_services = undefined;
+  }
+}
 
 // HMR: cleanup old services before new code loads
 if (import.meta.hot) {
-  import.meta.hot.dispose(() => {
-    console.log("[Server] HMR Dispose - cleaning up services");
-    if (globalThis.__kabelkrant_services) {
-      stopServices(globalThis.__kabelkrant_services);
-      globalThis.__kabelkrant_services = undefined;
-    }
-  });
   import.meta.hot.accept();
 }
