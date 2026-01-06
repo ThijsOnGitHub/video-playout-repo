@@ -41,8 +41,18 @@ interface ScheduleEvent {
   date?: Date;
 }
 
-// Generate color for program based on its ID
-function getProgramColor(programId: string): string {
+// Generate color for program based on its ID and type
+function getProgramColor(programId: string, programType?: string): string {
+  // Iframe programs get a distinct color scheme
+  if (programType === "iframe") {
+    const iframeColors = ["bg-amber-500", "bg-lime-500", "bg-emerald-500", "bg-sky-500"];
+    let hash = 0;
+    for (let i = 0; i < programId.length; i++) {
+      hash = programId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return iframeColors[Math.abs(hash) % iframeColors.length];
+  }
+
   const colors = ["bg-blue-500", "bg-green-500", "bg-purple-500", "bg-orange-500", "bg-pink-500", "bg-indigo-500", "bg-teal-500", "bg-red-500", "bg-yellow-500", "bg-cyan-500"];
 
   // Simple hash function to get consistent color for same program
@@ -69,6 +79,12 @@ function PlanningPage() {
       const durations: Record<string, number> = {};
 
       for (const program of programs) {
+        // For iframe programs, use the iframeDurationSeconds
+        if (program.programType === "iframe") {
+          durations[program.id] = program.iframeDurationSeconds || 60;
+          continue;
+        }
+
         if (!program.path) continue;
 
         try {
@@ -233,8 +249,9 @@ function PlanningPage() {
                       {eventsInHour.map((event, eventIndex) => {
                         const heightPerMinute = 1; // pixels per minute
                         const height = Math.max(event.durationMinutes * heightPerMinute, 24);
-                        const color = getProgramColor(event.program.id);
+                        const color = getProgramColor(event.program.id, event.program.programType);
                         const isScheduled = event.isScheduledDate;
+                        const isIframe = event.program.programType === "iframe";
 
                         return (
                           <div
@@ -311,13 +328,14 @@ function PlanningPage() {
                   {/* Events area */}
                   <div className="flex-1 relative min-h-[80px] p-2">
                     {eventsInHour.map((event, index) => {
-                      const color = getProgramColor(event.program.id);
+                      const color = getProgramColor(event.program.id, event.program.programType);
                       const isScheduled = event.isScheduledDate;
+                      const isIframe = event.program.programType === "iframe";
 
                       return (
                         <div
                           key={index}
-                          className={`mb-2 last:mb-0 ${color} bg-opacity-90 hover:bg-opacity-100 rounded-lg p-4 cursor-pointer transition-all shadow-md hover:shadow-lg ${isScheduled ? "ring-2 ring-yellow-400" : ""}`}
+                          className={`mb-2 last:mb-0 ${color} bg-opacity-90 hover:bg-opacity-100 rounded-lg p-4 cursor-pointer transition-all shadow-md hover:shadow-lg ${isScheduled ? "ring-2 ring-yellow-400" : ""} ${isIframe ? "border-2 border-dashed border-white/50" : ""}`}
                           onClick={() => {
                             navigate({
                               to: "/programs/$programId",
@@ -330,6 +348,11 @@ function PlanningPage() {
                               <h3 className="font-semibold text-lg mb-1 flex items-center gap-2">
                                 {isScheduled && <CalendarClock className="w-5 h-5 text-yellow-300" />}
                                 {event.program.programName}
+                                {isIframe && (
+                                  <Badge variant="secondary" className="bg-white/30 text-white border-white/50 text-xs">
+                                    IFRAME
+                                  </Badge>
+                                )}
                               </h3>
                               <div className="flex items-center gap-4 text-sm opacity-90">
                                 <div className="flex items-center gap-1">
@@ -341,7 +364,7 @@ function PlanningPage() {
                                     Duur: {formatDuration(event.durationMinutes * 60 * 1000)}
                                   </Badge>
                                 )}
-                                {event.program.playAll && (
+                                {event.program.playAll && !isIframe && (
                                   <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
                                     Speel alles af
                                   </Badge>

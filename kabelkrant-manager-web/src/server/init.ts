@@ -50,7 +50,7 @@ async function createServices(): Promise<KabelkrantServices> {
   return { storage, obsManager, videoPlaylist, playoutEngine, browserPlayout };
 }
 
-function stopServices(services: KabelkrantServices): void {
+export function stopServices(services: KabelkrantServices): void {
   console.log("[Server] Stopping services...");
   services.playoutEngine.cleanup();
   services.videoPlaylist.cleanup();
@@ -61,7 +61,10 @@ function stopServices(services: KabelkrantServices): void {
 // Singleton initialization
 let initPromise: Promise<KabelkrantServices> | null = null;
 
+
+
 export async function initializeServer(): Promise<KabelkrantServices> {
+  console.log("[Server] Initializing server...");
   if (globalThis.__kabelkrant_services) {
     return globalThis.__kabelkrant_services;
   }
@@ -84,9 +87,12 @@ export function getServices(): KabelkrantServices {
   return globalThis.__kabelkrant_services;
 }
 
+console.log("[Server] Module loaded", import.meta.url);
+
 // HMR: cleanup old services before new code loads
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
+    console.log("[Server] HMR Dispose - cleaning up services");
     if (globalThis.__kabelkrant_services) {
       stopServices(globalThis.__kabelkrant_services);
       globalThis.__kabelkrant_services = undefined;

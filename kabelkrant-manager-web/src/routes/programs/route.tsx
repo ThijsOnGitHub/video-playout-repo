@@ -38,6 +38,7 @@ function ProgramsLayout() {
       planning: [],
       playAll: true,
       scheduledDates: [],
+      programType: "video",
     };
     setPrograms([...programs, newProgram]);
     navigate({ to: "/programs/$programId", params: { programId: newProgram.id } });

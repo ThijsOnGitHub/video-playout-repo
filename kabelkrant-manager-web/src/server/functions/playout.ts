@@ -67,3 +67,21 @@ export const addVideosToClient = createServerFn({ method: "POST" })
     const success = await browserPlayout.addVideosToClient(data.clientId, data.videoPaths);
     return { success };
   });
+
+// Remove item from client playlist
+export const removeItemFromPlaylist = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ clientId: z.string(), index: z.number() }))
+  .handler(async ({ data }) => {
+    const browserPlayout = getBrowserPlayout();
+    const success = browserPlayout.removeItemFromClient(data.clientId, data.index);
+    return { success };
+  });
+
+// Stop current item on client
+export const stopCurrentItem = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ clientId: z.string() }))
+  .handler(async ({ data }) => {
+    const browserPlayout = getBrowserPlayout();
+    const success = browserPlayout.stopCurrentItem(data.clientId);
+    return { success };
+  });

@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
-import { FileVideo, Trash2, Monitor, Wifi, WifiOff } from "lucide-react";
+import { FileVideo, Trash2, Monitor, Wifi, WifiOff, Globe, X, Square, Video } from "lucide-react";
 import { TopBar } from "@/components/topBar";
 import { Sidebar } from "@/components/sidebar/sidebar";
 import { useRealtimeState } from "@/hooks/useRealtimeState";
 import { useSidebarItems } from "@/hooks/useSidebarItems";
 import { getPrograms } from "@/server/functions/programs";
-import { clearBrowserPlaylist, clearClientPlaylist } from "@/server/functions/playout";
+import { clearBrowserPlaylist, clearClientPlaylist, removeItemFromPlaylist, stopCurrentItem } from "@/server/functions/playout";
 import type { ProgramFormSchema } from "@/lib/schemas/program";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +29,7 @@ function PlaylistPage() {
     activePage: "playlist",
   });
 
-  const totalVideos = clients.reduce((sum, client) => sum + (client.currentVideo ? 1 : 0) + client.playlist.length, 0);
+  const totalVideos = clients.reduce((sum, client) => sum + (client.currentItem ? 1 : 0) + client.playlist.length, 0);
 
   return (
     <div>
@@ -78,7 +78,9 @@ function PlaylistPage() {
                       <div className="flex items-center gap-2">
                         <Monitor className="h-5 w-5 text-gray-500" />
                         <CardTitle className="text-base">Client {client.id.slice(0, 8)}...</CardTitle>
-                        <Badge variant={client.state === "video" ? "default" : "secondary"}>{client.state === "video" ? "Video" : client.state === "transitioning" ? "Overgang" : "Kabelkrant"}</Badge>
+                        <Badge variant={client.state === "video" || client.state === "iframe" || client.state === "raadsvergadering" ? "default" : "secondary"}>
+                          {client.state === "video" ? "Video" : client.state === "iframe" ? "Iframe" : client.state === "raadsvergadering" ? "Raadsvergadering" : "Kabelkrant"}
+                        </Badge>
                       </div>
                       <div className="flex items-center gap-2">
                         <Wifi className="h-4 w-4 text-green-500" />
@@ -89,7 +91,7 @@ function PlaylistPage() {
                           onClick={async () => {
                             await clearClientPlaylist({ data: { clientId: client.id } });
                           }}
-                          disabled={!client.currentVideo && client.playlist.length === 0}
+                          disabled={!client.currentItem && client.playlist.length === 0}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -97,13 +99,43 @@ function PlaylistPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {/* Current video */}
-                    {client.currentVideo && (
+                    {/* Current item (video, iframe or raadsvergadering) */}
+                    {client.currentItem && (
                       <div className="mb-3">
                         <p className="text-xs font-medium text-gray-500 mb-1">Nu aan het afspelen:</p>
-                        <div className="flex items-center gap-2 p-2 bg-green-50 rounded border border-green-200">
-                          <FileVideo className="h-4 w-4 text-green-600" />
-                          <span className="text-sm truncate">{client.currentVideo.path}</span>
+                        <div
+                          className={`flex items-center justify-between gap-2 p-2 rounded border ${client.currentItem.type === "iframe" ? "bg-purple-50 border-purple-200" : client.currentItem.type === "raadsvergadering" ? "bg-orange-50 border-orange-200" : "bg-green-50 border-green-200"}`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {client.currentItem.type === "iframe" ? (
+                              <Globe className="h-4 w-4 text-purple-600 flex-shrink-0" />
+                            ) : client.currentItem.type === "raadsvergadering" ? (
+                              <Video className="h-4 w-4 text-orange-600 flex-shrink-0" />
+                            ) : (
+                              <FileVideo className="h-4 w-4 text-green-600 flex-shrink-0" />
+                            )}
+                            <span className="text-sm truncate">
+                              {client.currentItem.type === "iframe"
+                                ? client.currentItem.url
+                                : client.currentItem.type === "raadsvergadering"
+                                  ? `Raadsvergadering: ${client.currentItem.webcastId}`
+                                  : client.currentItem.path}
+                            </span>
+                            {client.currentItem.type === "iframe" && (
+                              <span className="text-xs text-gray-500 flex-shrink-0">({client.currentItem.durationSeconds !== null ? `${client.currentItem.durationSeconds}s` : "∞"})</span>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 hover:bg-red-100 flex-shrink-0"
+                            onClick={async () => {
+                              await stopCurrentItem({ data: { clientId: client.id } });
+                            }}
+                          >
+                            <Square className="h-3 w-3 text-red-500 mr-1" />
+                            <span className="text-xs text-red-500">Stop</span>
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -115,10 +147,30 @@ function PlaylistPage() {
                         <Command className="border rounded">
                           <CommandList>
                             <CommandGroup>
-                              {client.playlist.map((video, index) => (
-                                <CommandItem key={`${video.path}-${index}`} className="text-sm">
-                                  <FileVideo className="mr-2 h-4 w-4" />
-                                  <span className="truncate">{video.path}</span>
+                              {client.playlist.map((item, index) => (
+                                <CommandItem key={`${item.type === "video" ? item.path : item.type === "iframe" ? item.url : item.webcastId}-${index}`} className="text-sm justify-between">
+                                  <div className="flex items-center">
+                                    {item.type === "iframe" ? (
+                                      <Globe className="mr-2 h-4 w-4 text-purple-500" />
+                                    ) : item.type === "raadsvergadering" ? (
+                                      <Video className="mr-2 h-4 w-4 text-orange-500" />
+                                    ) : (
+                                      <FileVideo className="mr-2 h-4 w-4" />
+                                    )}
+                                    <span className="truncate">{item.type === "iframe" ? item.url : item.type === "raadsvergadering" ? `Raadsvergadering: ${item.webcastId}` : item.path}</span>
+                                    {item.type === "iframe" && <span className="ml-2 text-xs text-gray-500">({item.durationSeconds !== null ? `${item.durationSeconds}s` : "∞"})</span>}
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 hover:bg-red-100"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      await removeItemFromPlaylist({ data: { clientId: client.id, index } });
+                                    }}
+                                  >
+                                    <X className="h-3 w-3 text-gray-500 hover:text-red-500" />
+                                  </Button>
                                 </CommandItem>
                               ))}
                             </CommandGroup>
@@ -128,7 +180,7 @@ function PlaylistPage() {
                     )}
 
                     {/* Empty state */}
-                    {!client.currentVideo && client.playlist.length === 0 && <p className="text-sm text-gray-400">Geen video's in de wachtrij</p>}
+                    {!client.currentItem && client.playlist.length === 0 && <p className="text-sm text-gray-400">Geen items in de wachtrij</p>}
                   </CardContent>
                 </Card>
               ))}

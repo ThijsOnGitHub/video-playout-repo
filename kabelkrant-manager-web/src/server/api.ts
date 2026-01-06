@@ -1,7 +1,12 @@
 import fs from "fs";
 import path from "path";
-import { getBrowserPlayout, type BrowserPlayoutEvent } from "./services/browserPlayout";
-import { getFileStorage } from "./services/fileStorage";
+import { type BrowserPlayoutEvent, type AdminStatusEvent, type BrowserPlayout } from "./services/browserPlayout";
+import { getServices } from "./init";
+
+// Helper to get browserPlayout from services
+function getBrowserPlayout(): BrowserPlayout {
+  return getServices().browserPlayout;
+}
 
 /**
  * Handle custom API routes for SSE and video streaming
@@ -10,9 +15,19 @@ export async function handleApiRoutes(request: Request): Promise<Response | null
   const url = new URL(request.url);
   const pathname = url.pathname;
 
+  // Dev-only: Reload services endpoint
+  if (pathname === "/api/dev/reload" && process.env.NODE_ENV !== "production") {
+    return handleDevReload();
+  }
+
   // SSE endpoint for playout events
   if (pathname === "/api/playout/events") {
     return handlePlayoutSSE(request);
+  }
+
+  // SSE endpoint for admin status updates
+  if (pathname === "/api/admin-events") {
+    return handleAdminSSE(request);
   }
 
   // Client status update endpoint
@@ -99,12 +114,59 @@ function handlePlayoutSSE(request: Request): Response {
 }
 
 /**
+ * Handle Server-Sent Events for admin status updates
+ */
+function handleAdminSSE(request: Request): Response {
+  const browserPlayout = getBrowserPlayout();
+  let listenerId: string | null = null;
+
+  // Create a readable stream for SSE
+  const stream = new ReadableStream({
+    start(controller) {
+      const encoder = new TextEncoder();
+
+      // Event handler for admin status events
+      const sendEvent = (event: AdminStatusEvent) => {
+        try {
+          const data = JSON.stringify(event);
+          controller.enqueue(encoder.encode(`event: ${event.type}\ndata: ${data}\n\n`));
+        } catch (e) {
+          console.error("[Admin SSE] Error sending event:", e);
+        }
+      };
+
+      // Register admin listener and get ID
+      listenerId = browserPlayout.addAdminListener(sendEvent);
+
+      // Send initial connection message
+      controller.enqueue(encoder.encode(`event: connected\ndata: ${JSON.stringify({ connected: true })}\n\n`));
+
+      // Handle admin disconnect
+      request.signal.addEventListener("abort", () => {
+        if (listenerId) {
+          browserPlayout.removeAdminListener(listenerId);
+        }
+      });
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
  * Handle client status update
  */
 async function handleClientStatusUpdate(request: Request): Promise<Response> {
   try {
     const body = await request.json();
-    const { clientId, currentVideo, playlist, state } = body;
+    const { clientId, currentVideo, currentItem, playlist, state } = body;
 
     if (!clientId) {
       return new Response(JSON.stringify({ error: "clientId required" }), {
@@ -114,7 +176,12 @@ async function handleClientStatusUpdate(request: Request): Promise<Response> {
     }
 
     const browserPlayout = getBrowserPlayout();
-    browserPlayout.updateClientStatus(clientId, { currentVideo, playlist, state });
+    browserPlayout.updateClientStatus(clientId, {
+      currentVideo,
+      currentItem,
+      playlist,
+      state,
+    });
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" },
@@ -231,7 +298,7 @@ async function handleVideoStream(request: Request, pathname: string): Promise<Re
  * Get playout settings
  */
 function handleGetPlayoutSettings(): Response {
-  const storage = getFileStorage();
+  const storage = getServices().storage;
   const settings = storage.getPlayoutSettings();
   return new Response(JSON.stringify(settings), {
     headers: { "Content-Type": "application/json" },
@@ -367,4 +434,28 @@ async function handleVideoUpload(request: Request): Promise<Response> {
       headers: { "Content-Type": "application/json" },
     });
   }
+}
+
+/**
+ * Dev-only: Reload server services (requires server restart to pick up new code)
+ */
+async function handleDevReload(): Promise<Response> {
+  console.log("[Dev] Reloading services...");
+
+  // Import dynamically to get fresh module
+  const { stopServices, initializeServer } = await import("./init");
+
+  try {
+    const services = getServices();
+    stopServices(services);
+    (globalThis as Record<string, unknown>).__kabelkrant_services = undefined;
+  } catch {
+    // Services might not be initialized yet
+  }
+
+  await initializeServer();
+
+  return new Response(JSON.stringify({ success: true, message: "Services reloaded" }), {
+    headers: { "Content-Type": "application/json" },
+  });
 }

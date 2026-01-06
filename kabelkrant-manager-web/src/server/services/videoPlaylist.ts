@@ -13,7 +13,6 @@ export class VideoPlaylist extends EventEmitter {
 
     // Check if video is playing every second
     this.checkInterval = setInterval(async () => {
-      console.log("Check if video is playing...");
       if (this.videos.length > 0 && !this.inSwitch) {
         try {
           const isPlaying = await this.obsManager.checkIfVideoPlays(this.getCurrentPlayout());

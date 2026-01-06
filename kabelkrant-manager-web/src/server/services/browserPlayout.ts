@@ -4,10 +4,44 @@ import { randomUUID } from "crypto";
 import type { PlayoutSettings } from "@/lib/types/PlayoutSettings";
 
 export interface BrowserPlayoutEvent {
-  type: "addVideos" | "clearPlaylist" | "currentPlaylist" | "settingsUpdate";
+  type: "addVideos" | "addIframe" | "addRaadsvergadering" | "clearPlaylist" | "removeItem" | "stopCurrent" | "currentPlaylist" | "settingsUpdate";
   data?: unknown;
 }
 
+export interface AdminStatusEvent {
+  type: "clientsUpdate" | "settingsUpdate";
+  data?: unknown;
+}
+
+export interface ClientsUpdateData {
+  clients: ClientStatus[];
+}
+
+export interface RemoveItemData {
+  index: number;
+}
+
+export interface PlaylistVideoItem {
+  type: "video";
+  path: string;
+  url: string;
+}
+
+export interface PlaylistIframeItem {
+  type: "iframe";
+  url: string;
+  durationSeconds: number | null; // null = infinite duration
+  muted: boolean;
+}
+
+export interface PlaylistRaadsvergaderingItem {
+  type: "raadsvergadering";
+  webcastId: string; // CompanyWebcast ID
+}
+
+export type PlaylistItem = PlaylistVideoItem | PlaylistIframeItem | PlaylistRaadsvergaderingItem;
+
+// Legacy interface for backwards compatibility
 export interface VideoItem {
   path: string;
   url: string;
@@ -17,8 +51,16 @@ export interface AddVideosData {
   videos: VideoItem[];
 }
 
+export interface AddIframeData {
+  iframe: PlaylistIframeItem;
+}
+
+export interface AddRaadsvergaderingData {
+  raadsvergadering: PlaylistRaadsvergaderingItem;
+}
+
 export interface CurrentPlaylistData {
-  videos: VideoItem[];
+  items: PlaylistItem[];
 }
 
 /** Status of a connected playout client */
@@ -27,8 +69,9 @@ export interface ClientStatus {
   connectedAt: Date;
   lastHeartbeat: Date;
   currentVideo: VideoItem | null;
-  playlist: VideoItem[];
-  state: "kabelkrant" | "video" | "transitioning";
+  currentItem: PlaylistItem | null;
+  playlist: PlaylistItem[];
+  state: "kabelkrant" | "video" | "iframe" | "raadsvergadering";
 }
 
 /** Client info stored on server */
@@ -36,6 +79,12 @@ interface ConnectedClient {
   id: string;
   callback: (event: BrowserPlayoutEvent) => void;
   status: ClientStatus;
+}
+
+/** Admin listener for status updates */
+interface AdminListener {
+  id: string;
+  callback: (event: AdminStatusEvent) => void;
 }
 
 /**
@@ -46,6 +95,7 @@ interface ConnectedClient {
  */
 export class BrowserPlayout extends EventEmitter {
   private connectedClients: Map<string, ConnectedClient> = new Map();
+  private adminListeners: Map<string, AdminListener> = new Map();
 
   constructor() {
     super();
@@ -65,6 +115,7 @@ export class BrowserPlayout extends EventEmitter {
         connectedAt: now,
         lastHeartbeat: now,
         currentVideo: null,
+        currentItem: null,
         playlist: [],
         state: "kabelkrant",
       },
@@ -74,6 +125,7 @@ export class BrowserPlayout extends EventEmitter {
     console.log(`[BrowserPlayout] Client ${clientId} connected. Total clients: ${this.connectedClients.size}`);
 
     this.emit("clientsChanged", this.getAllClientStatuses());
+    this.broadcastToAdmins({ type: "clientsUpdate", data: { clients: this.getAllClientStatuses() } });
 
     return clientId;
   }
@@ -83,6 +135,7 @@ export class BrowserPlayout extends EventEmitter {
     this.connectedClients.delete(clientId);
     console.log(`[BrowserPlayout] Client ${clientId} disconnected. Total clients: ${this.connectedClients.size}`);
     this.emit("clientsChanged", this.getAllClientStatuses());
+    this.broadcastToAdmins({ type: "clientsUpdate", data: { clients: this.getAllClientStatuses() } });
   }
 
   /** Update client status (called when client reports back) */
@@ -95,6 +148,7 @@ export class BrowserPlayout extends EventEmitter {
         lastHeartbeat: new Date(),
       };
       this.emit("clientsChanged", this.getAllClientStatuses());
+      this.broadcastToAdmins({ type: "clientsUpdate", data: { clients: this.getAllClientStatuses() } });
     }
   }
 
@@ -204,6 +258,25 @@ export class BrowserPlayout extends EventEmitter {
     });
   }
 
+  /** Remove a specific item from a client's playlist by index */
+  removeItemFromClient(clientId: string, index: number): boolean {
+    console.log(`[BrowserPlayout] Removing item at index ${index} from client ${clientId}`);
+
+    return this.sendToClient(clientId, {
+      type: "removeItem",
+      data: { index } as RemoveItemData,
+    });
+  }
+
+  /** Stop the currently playing item for a specific client */
+  stopCurrentItem(clientId: string): boolean {
+    console.log(`[BrowserPlayout] Stopping current item for client ${clientId}`);
+
+    return this.sendToClient(clientId, {
+      type: "stopCurrent",
+    });
+  }
+
   /** Get number of connected clients */
   getClientCount(): number {
     return this.connectedClients.size;
@@ -216,6 +289,72 @@ export class BrowserPlayout extends EventEmitter {
       type: "settingsUpdate",
       data: settings,
     });
+    // Also notify admin listeners
+    this.broadcastToAdmins({
+      type: "settingsUpdate",
+      data: settings,
+    });
+  }
+
+  /** Register an admin listener for status updates, returns listener ID */
+  addAdminListener(callback: (event: AdminStatusEvent) => void): string {
+    const listenerId = randomUUID();
+    this.adminListeners.set(listenerId, { id: listenerId, callback });
+    console.log(`[BrowserPlayout] Admin listener ${listenerId} connected. Total admin listeners: ${this.adminListeners.size}`);
+
+    // Send initial status
+    callback({ type: "clientsUpdate", data: { clients: this.getAllClientStatuses() } });
+
+    return listenerId;
+  }
+
+  /** Remove an admin listener */
+  removeAdminListener(listenerId: string): void {
+    this.adminListeners.delete(listenerId);
+    console.log(`[BrowserPlayout] Admin listener ${listenerId} disconnected. Total admin listeners: ${this.adminListeners.size}`);
+  }
+
+  /** Broadcast event to all admin listeners */
+  private broadcastToAdmins(event: AdminStatusEvent): void {
+    for (const listener of this.adminListeners.values()) {
+      try {
+        listener.callback(event);
+      } catch (e) {
+        console.error(`[BrowserPlayout] Error sending event to admin listener ${listener.id}:`, e);
+      }
+    }
+  }
+
+  /** Add iframe to all clients' playlist */
+  addIframe(url: string, durationSeconds: number | null, muted: boolean): void {
+    console.log(`[BrowserPlayout] Adding iframe to playlist: ${url} for ${durationSeconds === null ? "infinite" : durationSeconds + " seconds"}, muted: ${muted}`);
+    this.broadcast({
+      type: "addIframe",
+      data: {
+        iframe: {
+          type: "iframe",
+          url,
+          durationSeconds,
+          muted,
+        },
+      } as AddIframeData,
+    });
+    this.emit("change");
+  }
+
+  /** Add raadsvergadering (CompanyWebcast) to all clients' playlist */
+  addRaadsvergadering(webcastId: string): void {
+    console.log(`[BrowserPlayout] Adding raadsvergadering to playlist: ${webcastId}`);
+    this.broadcast({
+      type: "addRaadsvergadering",
+      data: {
+        raadsvergadering: {
+          type: "raadsvergadering",
+          webcastId,
+        },
+      } as AddRaadsvergaderingData,
+    });
+    this.emit("change");
   }
 
   /** Cleanup */
@@ -233,12 +372,7 @@ declare global {
 }
 
 export function getBrowserPlayout(): BrowserPlayout {
-  // Check if instance exists and has all required methods (handles hot reload)
-  if (globalThis.__browserPlayoutInstance && typeof globalThis.__browserPlayoutInstance.broadcastSettingsUpdate !== "function") {
-    console.log("[BrowserPlayout] Recreating instance due to missing methods (hot reload)");
-    globalThis.__browserPlayoutInstance = undefined;
-  }
-
+  
   if (!globalThis.__browserPlayoutInstance) {
     console.log("[BrowserPlayout] Creating new singleton instance");
     globalThis.__browserPlayoutInstance = new BrowserPlayout();

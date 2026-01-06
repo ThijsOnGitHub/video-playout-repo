@@ -59,13 +59,16 @@ export class PlayoutEngine {
   }
 
   private checkIfVideoMustPlay() {
+    //console.log("[PlayoutEngine] Checking if video must play...");
     const videos = this.storage.getPrograms();
     const now = new Date();
     const start = subSeconds(now, 1);
     const currentDay = getDay(now);
 
+    //console.log("[PlayoutEngine] Current day:", currentDay, "Now:", now.toISOString(), "!!!!Start check from:", start.toISOString());
     videos.some((video) => {
       if (this.shouldVideoPlay(video, currentDay, now, start)) {
+        console.log("[PlayoutEngine] Video should play now:", video);
         this.playVideoItem(video);
         return true;
       }
@@ -82,6 +85,7 @@ export class PlayoutEngine {
   private shouldVideoPlay(video: VideoItem, currentDay: number, currentDate: Date, prevCheckDate: Date): boolean {
     // Check scheduled dates (specific date + time)
     if (video.scheduledDates && video.scheduledDates.length > 0) {
+      //console.log("[PlayoutEngine] Checking scheduled dates for video", video.scheduledDates);
       const scheduledMatch = this.shouldScheduledDatePlay(video.scheduledDates, currentDate, prevCheckDate);
       if (scheduledMatch) {
         return true;
@@ -129,6 +133,18 @@ export class PlayoutEngine {
   }
 
   playVideoItem(videoItem: VideoItem) {
+    // Check if this is an iframe program
+    if (videoItem.programType === "iframe") {
+      this.playIframeItem(videoItem);
+      return;
+    }
+
+    // Check if this is a raadsvergadering program
+    if (videoItem.programType === "raadsvergadering") {
+      this.playRaadsvergaderingItem(videoItem);
+      return;
+    }
+
     console.log("Video item prepare to play", videoItem, process.env.VIDEO_BASE_PATH ?? "undefined");
 
     const videoBasePath = process.env.VIDEO_BASE_PATH || "./videos";
@@ -161,6 +177,35 @@ export class PlayoutEngine {
     console.log("The following video's will be added to the playlist", videos);
     const target = this.getActivePlayoutTarget();
     target.addVideos(videos);
+  }
+
+  private playIframeItem(videoItem: VideoItem) {
+    if (!videoItem.iframeUrl) {
+      console.error("Iframe program has no URL", videoItem);
+      return;
+    }
+
+    // Use null for infinite duration, only default to 60 if undefined
+    const durationSeconds = videoItem.iframeDurationSeconds === undefined ? 60 : videoItem.iframeDurationSeconds;
+    const muted = videoItem.iframeMuted !== false; // Default to true
+    console.log(`[PlayoutEngine] Adding iframe to playlist: ${videoItem.iframeUrl} for ${durationSeconds === null ? "infinite" : durationSeconds + " seconds"}, muted: ${muted}`);
+
+    if (this.browserPlayout) {
+      this.browserPlayout.addIframe(videoItem.iframeUrl, durationSeconds, muted);
+    }
+  }
+
+  private playRaadsvergaderingItem(videoItem: VideoItem) {
+    if (!videoItem.webcastId) {
+      console.error("Raadsvergadering program has no webcastId", videoItem);
+      return;
+    }
+
+    console.log(`[PlayoutEngine] Adding raadsvergadering to playlist: ${videoItem.webcastId}`);
+
+    if (this.browserPlayout) {
+      this.browserPlayout.addRaadsvergadering(videoItem.webcastId);
+    }
   }
 
   getPlaylist(): string[] {

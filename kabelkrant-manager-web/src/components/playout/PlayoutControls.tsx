@@ -1,13 +1,13 @@
 import type { PlayoutSettings } from "@/lib/types/PlayoutSettings";
-import type { VideoItem } from "@/server/services/browserPlayout";
-
-type PlayoutState = "kabelkrant" | "video" | "transitioning";
+import type { PlayoutState, CurrentVideo, CurrentIframe, CurrentRaadsvergadering, ClientPlaylistItem } from "@/lib/types/playout";
 
 interface PlayoutControlsProps {
   settings: PlayoutSettings | undefined;
   state: PlayoutState;
-  currentVideo: VideoItem | null;
-  playlistLength: number;
+  currentVideo: CurrentVideo | null;
+  currentIframe: CurrentIframe | null;
+  currentRaadsvergadering: CurrentRaadsvergadering | null;
+  playlist: ClientPlaylistItem[];
   microphoneEnabled: boolean;
   isFullscreen: boolean;
   showControls: boolean;
@@ -15,7 +15,21 @@ interface PlayoutControlsProps {
   onToggleFullscreen: () => void;
 }
 
-export function PlayoutControls({ settings, state, currentVideo, playlistLength, microphoneEnabled, isFullscreen, showControls, onToggleMicrophone, onToggleFullscreen }: PlayoutControlsProps) {
+export function PlayoutControls({
+  settings,
+  state,
+  currentVideo,
+  currentIframe,
+  currentRaadsvergadering,
+  playlist,
+  microphoneEnabled,
+  isFullscreen,
+  showControls,
+  onToggleMicrophone,
+  onToggleFullscreen,
+}: PlayoutControlsProps) {
+  const isPlaying = currentVideo !== null || currentIframe !== null || currentRaadsvergadering !== null;
+
   return (
     <div
       className={`absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${showControls ? "opacity-100" : "opacity-0 pointer-events-none"}`}
@@ -37,11 +51,14 @@ export function PlayoutControls({ settings, state, currentVideo, playlistLength,
         {/* Status info */}
         <div className="flex items-center gap-4 text-sm">
           <span className="text-gray-400">
-            Status: <span className={state === "video" ? "text-green-400" : "text-blue-400"}>{state === "video" ? "Video" : state === "transitioning" ? "Overgang..." : "Kabelkrant"}</span>
+            Status:{" "}
+            <span className={state === "video" ? "text-green-400" : state === "iframe" ? "text-purple-400" : state === "raadsvergadering" ? "text-orange-400" : "text-blue-400"}>
+              {state === "video" ? "Video" : state === "iframe" ? "Iframe" : state === "raadsvergadering" ? "Raadsvergadering" : "Kabelkrant"}
+            </span>
           </span>
-          {(playlistLength > 0 || currentVideo) && (
+          {(playlist.length > 0 || isPlaying) && (
             <span className="text-gray-400">
-              Wachtrij: <span className="text-white">{playlistLength + (currentVideo ? 1 : 0)}</span>
+              Wachtrij: <span className="text-white">{playlist.length + (isPlaying ? 1 : 0)}</span>
             </span>
           )}
         </div>

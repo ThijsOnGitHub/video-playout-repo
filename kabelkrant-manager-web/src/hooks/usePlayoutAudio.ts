@@ -4,8 +4,10 @@ import type { PlayoutSettings } from "@/lib/types/PlayoutSettings";
 interface UsePlayoutAudioOptions {
   settings: PlayoutSettings | undefined;
   isActivated: boolean;
-  state: "kabelkrant" | "video" | "transitioning";
+  state: "kabelkrant" | "video" | "iframe" | "raadsvergadering";
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  /** When true, the iframe has no audio so radio can continue playing */
+  iframeMuted?: boolean;
 }
 
 interface UsePlayoutAudioReturn {
@@ -17,7 +19,7 @@ interface UsePlayoutAudioReturn {
   setupVideoAudio: () => void;
 }
 
-export function usePlayoutAudio({ settings, isActivated, state, videoRef }: UsePlayoutAudioOptions): UsePlayoutAudioReturn {
+export function usePlayoutAudio({ settings, isActivated, state, videoRef, iframeMuted = true }: UsePlayoutAudioOptions): UsePlayoutAudioReturn {
   const [microphoneEnabled, setMicrophoneEnabled] = useState(false);
 
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -33,19 +35,24 @@ export function usePlayoutAudio({ settings, isActivated, state, videoRef }: UseP
     stateRef.current = state;
   }, [state]);
 
-  // Fade audio: radio/mic fades out when video starts, video audio fades in (and vice versa)
+  // Fade audio: radio/mic fades out when video or iframe (with audio) starts
   useEffect(() => {
     const fadeTimeMs = settings?.audioCrossfadeDuration ?? 1500;
     const fadeTime = fadeTimeMs / 1000;
     const currentTime = audioContextRef.current?.currentTime || 0;
 
-    // Fade radio/mic audio
+    // Fade radio/mic audio:
+    // - Always mute during video playback
+    // - Always mute during raadsvergadering (it has its own audio)
+    // - During iframe: mute radio if iframeMuted is true (iframe wants silence from radio)
     if (gainNodeRef.current && microphoneEnabled) {
-      const radioTargetGain = state === "video" ? 0 : 1;
+      const shouldMuteForIframe = state === "iframe" && iframeMuted;
+      const shouldMuteRadio = state === "video" || state === "raadsvergadering" || shouldMuteForIframe;
+      const radioTargetGain = shouldMuteRadio ? 0 : 1;
       gainNodeRef.current.gain.cancelScheduledValues(currentTime);
       gainNodeRef.current.gain.setValueAtTime(gainNodeRef.current.gain.value, currentTime);
       gainNodeRef.current.gain.linearRampToValueAtTime(radioTargetGain, currentTime + fadeTime);
-      console.log(`[Playout] Fading radio/mic from ${gainNodeRef.current.gain.value} to ${radioTargetGain} over ${fadeTime}s`);
+      console.log(`[Playout] Fading radio/mic from ${gainNodeRef.current.gain.value} to ${radioTargetGain} over ${fadeTime}s (state: ${state}, iframeMuted: ${iframeMuted})`);
     }
 
     // Fade video audio

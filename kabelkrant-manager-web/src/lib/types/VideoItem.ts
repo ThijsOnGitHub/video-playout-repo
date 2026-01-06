@@ -4,6 +4,8 @@ export interface ScheduledDate {
   note?: string; // Optionele notitie voor deze specifieke uitzending
 }
 
+export type ProgramType = "video" | "iframe" | "raadsvergadering";
+
 export interface VideoItem {
   id: string;
   playAll: boolean;
@@ -11,6 +13,13 @@ export interface VideoItem {
   path: string;
   planning: Planning[];
   scheduledDates?: ScheduledDate[]; // Specifieke datum/tijd planning
+  // Iframe support
+  programType?: ProgramType; // "video" (default), "iframe", or "raadsvergadering"
+  iframeUrl?: string; // URL voor iframe type
+  iframeDurationSeconds?: number | null; // Hoe lang de iframe getoond wordt (null = oneindig)
+  iframeMuted?: boolean; // Of de audio gedempt moet worden (standaard true)
+  // Raadsvergadering (CompanyWebcast) specific
+  webcastId?: string; // CompanyWebcast ID, e.g., "abc5703d-b1f7-46d6-9ef9-4a224001f8e6"
 }
 
 export interface Planning {
