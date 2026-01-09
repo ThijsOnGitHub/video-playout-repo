@@ -20,8 +20,8 @@ FROM node:22-alpine AS runner
 
 WORKDIR /app
 
-# Create data directory
-RUN mkdir -p /app/data
+# Create data and videos directories
+RUN mkdir -p /app/data /videos
 
 # Copy built application (Nitro outputs to .output/)
 COPY --from=builder /app/.output ./.output
