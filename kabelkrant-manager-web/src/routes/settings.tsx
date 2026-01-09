@@ -30,6 +30,11 @@ function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
+  // Update container state
+  const [updatePassword, setUpdatePassword] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+
   const sidebarItems = useSidebarItems({
     programs: programs as ProgramFormSchema[],
     activePage: "settings",
@@ -54,6 +59,39 @@ function SettingsPage() {
     const width = settings.resolution.width;
     const height = settings.resolution.height;
     window.open("/playout", "kabelkrant-playout", `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`);
+  };
+
+  const handleUpdate = async () => {
+    if (!updatePassword) {
+      setUpdateMessage("Voer een wachtwoord in");
+      return;
+    }
+
+    setIsUpdating(true);
+    setUpdateMessage(null);
+    try {
+      const response = await fetch("/api/admin/update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password: updatePassword }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setUpdateMessage("✅ Update gestart! Container wordt opnieuw gestart...");
+        setUpdatePassword("");
+      } else {
+        setUpdateMessage(`❌ ${data.error || "Update mislukt"}`);
+      }
+    } catch (error) {
+      console.error("Error updating container:", error);
+      setUpdateMessage("❌ Fout bij updaten");
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   return (
@@ -245,6 +283,47 @@ function SettingsPage() {
                     }
                   />
                   <p className="text-sm text-gray-500">Crossfade tussen radio/mic audio en video audio. Aanbevolen: 1500ms.</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Container Update */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Container Updaten</CardTitle>
+                <CardDescription>Update de container naar de nieuwste versie van GitHub</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="updatePassword">Update Wachtwoord</Label>
+                  <Input
+                    id="updatePassword"
+                    type="password"
+                    placeholder="Voer update wachtwoord in"
+                    value={updatePassword}
+                    onChange={(e) => setUpdatePassword(e.target.value)}
+                    disabled={isUpdating}
+                  />
+                  <p className="text-sm text-gray-500">
+                    Dit wachtwoord is ingesteld via de UPDATE_PASSWORD omgevingsvariabele bij het starten van de container.
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Button onClick={handleUpdate} disabled={isUpdating || !updatePassword} variant="destructive">
+                    {isUpdating ? "Updaten..." : "🔄 Update Container"}
+                  </Button>
+                  {updateMessage && (
+                    <span className={updateMessage.includes("❌") ? "text-red-500" : "text-green-500"}>{updateMessage}</span>
+                  )}
+                </div>
+                <div className="text-sm text-gray-500 space-y-1">
+                  <p>⚠️ Tijdens het updaten:</p>
+                  <ul className="list-disc list-inside ml-2">
+                    <li>Wordt de nieuwste image van GitHub Container Registry opgehaald</li>
+                    <li>Wordt de container opnieuw gestart met de nieuwe versie</li>
+                    <li>Blijven alle data en instellingen behouden</li>
+                    <li>Kan de verbinding tijdelijk verbroken worden</li>
+                  </ul>
                 </div>
               </CardContent>
             </Card>

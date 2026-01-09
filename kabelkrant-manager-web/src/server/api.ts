@@ -1,7 +1,11 @@
 import fs from "fs";
 import path from "path";
+import { exec } from "child_process";
+import { promisify } from "util";
 import { type BrowserPlayoutEvent, type AdminStatusEvent, type BrowserPlayout } from "./services/browserPlayout";
 import { getServices } from "./init";
+
+const execAsync = promisify(exec);
 
 // Helper to get browserPlayout from services
 function getBrowserPlayout(): BrowserPlayout {
@@ -61,6 +65,11 @@ export async function handleApiRoutes(request: Request): Promise<Response | null
     if (request.method === "GET") {
       return handleGetPlayoutSettings();
     }
+  }
+
+  // Container self-update endpoint (admin only)
+  if (pathname === "/api/admin/update" && request.method === "POST") {
+    return handleContainerUpdate(request);
   }
 
   return null;
@@ -458,4 +467,75 @@ async function handleDevReload(): Promise<Response> {
   return new Response(JSON.stringify({ success: true, message: "Services reloaded" }), {
     headers: { "Content-Type": "application/json" },
   });
+}
+
+/**
+ * Handle container self-update (admin only)
+ * Requires Docker socket to be mounted: -v /var/run/docker.sock:/var/run/docker.sock
+ */
+async function handleContainerUpdate(request: Request): Promise<Response> {
+  try {
+    // Check authentication
+    const body = await request.json();
+    const { password } = body;
+
+    const expectedPassword = process.env.UPDATE_PASSWORD || "changeme";
+    if (password !== expectedPassword) {
+      console.warn("[Update] Authentication failed");
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Only allow in production
+    if (process.env.NODE_ENV !== "production") {
+      return new Response(JSON.stringify({ error: "Update only available in production mode" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Check if Docker socket is mounted
+    if (!fs.existsSync("/var/run/docker.sock")) {
+      return new Response(
+        JSON.stringify({
+          error: "Docker socket not mounted. Run container with: -v /var/run/docker.sock:/var/run/docker.sock",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    console.log("[Update] Starting container self-update...");
+
+    // Execute the update script in the background
+    // The script will replace this container, so we won't get the full output
+    execAsync("/app/update.sh")
+      .then(() => {
+        console.log("[Update] Update script completed successfully");
+      })
+      .catch((error) => {
+        console.error("[Update] Update script failed:", error);
+      });
+
+    // Return immediately since the container will be replaced
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: "Update started. Container will restart with the latest image.",
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    console.error("[Update] Error:", error);
+    return new Response(JSON.stringify({ error: "Update failed" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 }
