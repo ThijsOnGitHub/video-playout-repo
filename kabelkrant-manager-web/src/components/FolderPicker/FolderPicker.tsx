@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { Folder, FolderOpen, ChevronRight, ChevronUp, FolderPlus, Pencil } from "lucide-react";
+import { Folder, FolderOpen, ChevronRight, ChevronUp, FolderPlus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { browseDirectory, createDirectory, renameDirectory } from "@/server/functions/files";
+import { browseDirectory, createDirectory, renameDirectory, deleteDirectory } from "@/server/functions/files";
 
 interface DirectoryEntry {
   name: string;
@@ -29,6 +29,10 @@ export const FolderPicker: React.FC<FolderPickerProps> = ({ value, onChange }) =
   const [renameFolderPath, setRenameFolderPath] = useState("");
   const [renameFolderName, setRenameFolderName] = useState("");
   const [renameError, setRenameError] = useState("");
+  const [deleteFolderOpen, setDeleteFolderOpen] = useState(false);
+  const [deleteFolderPath, setDeleteFolderPath] = useState("");
+  const [deleteFolderName, setDeleteFolderName] = useState("");
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -139,6 +143,36 @@ export const FolderPicker: React.FC<FolderPickerProps> = ({ value, onChange }) =
     }
   }
 
+  function openDeleteDialog(folderPath: string, folderName: string) {
+    setDeleteFolderPath(folderPath);
+    setDeleteFolderName(folderName);
+    setDeleteError("");
+    setDeleteFolderOpen(true);
+  }
+
+  async function handleDeleteFolder() {
+    try {
+      setDeleteError("");
+      await deleteDirectory({
+        data: {
+          relativePath: deleteFolderPath,
+        },
+      });
+
+      setDeleteFolderOpen(false);
+      setDeleteFolderPath("");
+      setDeleteFolderName("");
+      loadDirectory(currentPath);
+
+      // Clear selected path if the deleted folder was selected
+      if (selectedPath === deleteFolderPath) {
+        setSelectedPath("");
+      }
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Er is een fout opgetreden");
+    }
+  }
+
   const pathParts = currentPath ? currentPath.split("/") : [];
 
   return (
@@ -224,6 +258,17 @@ export const FolderPicker: React.FC<FolderPickerProps> = ({ value, onChange }) =
                     }}
                   >
                     <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDeleteDialog(entry.path, entry.name);
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3" />
                   </Button>
                   <Button
                     variant={selectedPath === entry.path ? "default" : "ghost"}
@@ -355,6 +400,47 @@ export const FolderPicker: React.FC<FolderPickerProps> = ({ value, onChange }) =
               Annuleren
             </Button>
             <Button onClick={handleRenameFolder}>Hernoemen</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete folder confirmation dialog */}
+      <Dialog open={deleteFolderOpen} onOpenChange={setDeleteFolderOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Map verwijderen</DialogTitle>
+            <DialogDescription>Weet je zeker dat je deze map wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+              <p className="text-sm font-medium text-destructive">Waarschuwing</p>
+              <p className="text-sm text-muted-foreground mt-1">Alle bestanden en submappen in deze map worden permanent verwijderd.</p>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted-foreground">Map: </span>
+              <span className="font-medium">{deleteFolderName}</span>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted-foreground">Pad: </span>
+              <span className="font-medium">{deleteFolderPath}</span>
+            </div>
+            {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteFolderOpen(false);
+                setDeleteFolderPath("");
+                setDeleteFolderName("");
+                setDeleteError("");
+              }}
+            >
+              Annuleren
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteFolder}>
+              Verwijderen
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

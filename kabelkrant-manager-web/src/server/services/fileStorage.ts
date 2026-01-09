@@ -230,6 +230,43 @@ export class FileStorage {
   }
 
   /**
+   * Delete a directory and all its contents
+   */
+  deleteDirectory(relativePath: string): boolean {
+    const videoBasePath = process.env.VIDEO_BASE_PATH || "/videos";
+    const folderPath = path.join(videoBasePath, relativePath);
+
+    // Security: Prevent directory traversal
+    const normalizedPath = path.normalize(folderPath);
+    const normalizedBase = path.normalize(videoBasePath);
+
+    if (!normalizedPath.startsWith(normalizedBase)) {
+      throw new Error("Invalid path");
+    }
+
+    // Prevent deleting the base video path itself
+    if (normalizedPath === normalizedBase) {
+      throw new Error("Cannot delete the base video directory");
+    }
+
+    // Check if folder exists
+    if (!fs.existsSync(folderPath)) {
+      throw new Error("Folder does not exist");
+    }
+
+    // Check if it's actually a directory
+    const stat = fs.statSync(folderPath);
+    if (!stat.isDirectory()) {
+      throw new Error("Path is not a directory");
+    }
+
+    // Delete the directory recursively
+    fs.rmSync(folderPath, { recursive: true, force: true });
+
+    return true;
+  }
+
+  /**
    * Delete a video file from a folder
    */
   deleteVideo(folderPath: string, fileName: string): boolean {

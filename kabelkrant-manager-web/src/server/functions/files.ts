@@ -40,6 +40,17 @@ export const renameDirectory = createServerFn({ method: "POST" })
     return storage.renameDirectory(data.relativePath, data.newFolderName);
   });
 
+export const deleteDirectory = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      relativePath: z.string(),
+    })
+  )
+  .handler(async ({ data }) => {
+    const { storage } = await initializeServer();
+    return storage.deleteDirectory(data.relativePath);
+  });
+
 export const deleteVideo = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
