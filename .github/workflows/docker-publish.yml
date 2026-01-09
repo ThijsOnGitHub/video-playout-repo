@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - users/thijs/add-web-version
     paths:
       - "kabelkrant-manager-web/**"
       - ".github/workflows/docker-publish.yml"
