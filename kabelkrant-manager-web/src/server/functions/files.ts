@@ -16,6 +16,30 @@ export const browseDirectory = createServerFn({ method: "GET" })
     return storage.browseDirectory(data.relativePath || "");
   });
 
+export const createDirectory = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      relativePath: z.string(),
+      folderName: z.string(),
+    })
+  )
+  .handler(async ({ data }) => {
+    const { storage } = await initializeServer();
+    return storage.createDirectory(data.relativePath, data.folderName);
+  });
+
+export const renameDirectory = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      relativePath: z.string(),
+      newFolderName: z.string(),
+    })
+  )
+  .handler(async ({ data }) => {
+    const { storage } = await initializeServer();
+    return storage.renameDirectory(data.relativePath, data.newFolderName);
+  });
+
 export const deleteVideo = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({

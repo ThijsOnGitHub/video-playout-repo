@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Folder, FolderOpen, ChevronRight, ChevronUp } from "lucide-react";
+import { Folder, FolderOpen, ChevronRight, ChevronUp, FolderPlus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { browseDirectory } from "@/server/functions/files";
+import { Input } from "@/components/ui/input";
+import { browseDirectory, createDirectory, renameDirectory } from "@/server/functions/files";
 
 interface DirectoryEntry {
   name: string;
@@ -21,6 +22,13 @@ export const FolderPicker: React.FC<FolderPickerProps> = ({ value, onChange }) =
   const [entries, setEntries] = useState<DirectoryEntry[]>([]);
   const [selectedPath, setSelectedPath] = useState(value || "");
   const [loading, setLoading] = useState(false);
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [createError, setCreateError] = useState("");
+  const [renameFolderOpen, setRenameFolderOpen] = useState(false);
+  const [renameFolderPath, setRenameFolderPath] = useState("");
+  const [renameFolderName, setRenameFolderName] = useState("");
+  const [renameError, setRenameError] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -71,6 +79,66 @@ export const FolderPicker: React.FC<FolderPickerProps> = ({ value, onChange }) =
     setSelectedPath(currentPath);
   }
 
+  async function handleCreateFolder() {
+    if (!newFolderName.trim()) {
+      setCreateError("Mapnaam is verplicht");
+      return;
+    }
+
+    try {
+      setCreateError("");
+      const newPath = await createDirectory({
+        data: {
+          relativePath: currentPath,
+          folderName: newFolderName.trim(),
+        },
+      });
+
+      setNewFolderName("");
+      setCreateFolderOpen(false);
+      loadDirectory(currentPath);
+      setSelectedPath(newPath);
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : "Er is een fout opgetreden");
+    }
+  }
+
+  function openRenameDialog(folderPath: string, folderName: string) {
+    setRenameFolderPath(folderPath);
+    setRenameFolderName(folderName);
+    setRenameError("");
+    setRenameFolderOpen(true);
+  }
+
+  async function handleRenameFolder() {
+    if (!renameFolderName.trim()) {
+      setRenameError("Mapnaam is verplicht");
+      return;
+    }
+
+    try {
+      setRenameError("");
+      const newPath = await renameDirectory({
+        data: {
+          relativePath: renameFolderPath,
+          newFolderName: renameFolderName.trim(),
+        },
+      });
+
+      setRenameFolderOpen(false);
+      setRenameFolderPath("");
+      setRenameFolderName("");
+      loadDirectory(currentPath);
+
+      // Update selected path if the renamed folder was selected
+      if (selectedPath === renameFolderPath) {
+        setSelectedPath(newPath);
+      }
+    } catch (error) {
+      setRenameError(error instanceof Error ? error.message : "Er is een fout opgetreden");
+    }
+  }
+
   const pathParts = currentPath ? currentPath.split("/") : [];
 
   return (
@@ -88,18 +156,24 @@ export const FolderPicker: React.FC<FolderPickerProps> = ({ value, onChange }) =
         </DialogHeader>
 
         {/* Breadcrumb navigation */}
-        <div className="flex items-center gap-1 text-sm text-muted-foreground border-b pb-2 flex-wrap">
-          <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => navigateToFolder("")}>
-            Root
+        <div className="flex items-center justify-between border-b pb-2">
+          <div className="flex items-center gap-1 text-sm text-muted-foreground flex-wrap">
+            <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => navigateToFolder("")}>
+              Root
+            </Button>
+            {pathParts.map((part, index) => (
+              <span key={index} className="flex items-center">
+                <ChevronRight className="h-4 w-4" />
+                <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => navigateToFolder(pathParts.slice(0, index + 1).join("/"))}>
+                  {part}
+                </Button>
+              </span>
+            ))}
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setCreateFolderOpen(true)}>
+            <FolderPlus className="h-4 w-4 mr-2" />
+            Nieuwe map
           </Button>
-          {pathParts.map((part, index) => (
-            <span key={index} className="flex items-center">
-              <ChevronRight className="h-4 w-4" />
-              <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => navigateToFolder(pathParts.slice(0, index + 1).join("/"))}>
-                {part}
-              </Button>
-            </span>
-          ))}
         </div>
 
         {/* Current folder selection */}
@@ -139,17 +213,30 @@ export const FolderPicker: React.FC<FolderPickerProps> = ({ value, onChange }) =
               >
                 <Folder className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm flex-1">{entry.name}</span>
-                <Button
-                  variant={selectedPath === entry.path ? "default" : "ghost"}
-                  size="sm"
-                  className="h-6"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    selectFolder(entry.path);
-                  }}
-                >
-                  {selectedPath === entry.path ? "✓" : "Selecteer"}
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openRenameDialog(entry.path, entry.name);
+                    }}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant={selectedPath === entry.path ? "default" : "ghost"}
+                    size="sm"
+                    className="h-6"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      selectFolder(entry.path);
+                    }}
+                  >
+                    {selectedPath === entry.path ? "✓" : "Selecteer"}
+                  </Button>
+                </div>
               </button>
             ))
           )}
@@ -172,6 +259,105 @@ export const FolderPicker: React.FC<FolderPickerProps> = ({ value, onChange }) =
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Create folder dialog */}
+      <Dialog open={createFolderOpen} onOpenChange={setCreateFolderOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Nieuwe map maken</DialogTitle>
+            <DialogDescription>Maak een nieuwe map in de huidige locatie</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="folder-name" className="text-sm font-medium">
+                Mapnaam
+              </label>
+              <Input
+                id="folder-name"
+                value={newFolderName}
+                onChange={(e) => {
+                  setNewFolderName(e.target.value);
+                  setCreateError("");
+                }}
+                placeholder="Mijn nieuwe map"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleCreateFolder();
+                  }
+                }}
+              />
+              {createError && <p className="text-sm text-destructive">{createError}</p>}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <span>Locatie: </span>
+              <span className="font-medium">{currentPath || "/"}</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCreateFolderOpen(false);
+                setNewFolderName("");
+                setCreateError("");
+              }}
+            >
+              Annuleren
+            </Button>
+            <Button onClick={handleCreateFolder}>Maken</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename folder dialog */}
+      <Dialog open={renameFolderOpen} onOpenChange={setRenameFolderOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Map hernoemen</DialogTitle>
+            <DialogDescription>Geef de map een nieuwe naam</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="rename-folder-name" className="text-sm font-medium">
+                Nieuwe mapnaam
+              </label>
+              <Input
+                id="rename-folder-name"
+                value={renameFolderName}
+                onChange={(e) => {
+                  setRenameFolderName(e.target.value);
+                  setRenameError("");
+                }}
+                placeholder="Nieuwe naam"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleRenameFolder();
+                  }
+                }}
+              />
+              {renameError && <p className="text-sm text-destructive">{renameError}</p>}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <span>Map: </span>
+              <span className="font-medium">{renameFolderPath}</span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRenameFolderOpen(false);
+                setRenameFolderPath("");
+                setRenameFolderName("");
+                setRenameError("");
+              }}
+            >
+              Annuleren
+            </Button>
+            <Button onClick={handleRenameFolder}>Hernoemen</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 };

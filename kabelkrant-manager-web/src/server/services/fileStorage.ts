@@ -144,6 +144,92 @@ export class FileStorage {
   }
 
   /**
+   * Create a new directory
+   */
+  createDirectory(relativePath: string, folderName: string): string {
+    const videoBasePath = process.env.VIDEO_BASE_PATH || "/videos";
+    const parentPath = path.join(videoBasePath, relativePath);
+    const newFolderPath = path.join(parentPath, folderName);
+
+    // Security: Prevent directory traversal
+    const normalizedParent = path.normalize(parentPath);
+    const normalizedNew = path.normalize(newFolderPath);
+    const normalizedBase = path.normalize(videoBasePath);
+
+    if (!normalizedParent.startsWith(normalizedBase) || !normalizedNew.startsWith(normalizedBase)) {
+      throw new Error("Invalid path");
+    }
+
+    // Check if parent directory exists
+    if (!fs.existsSync(parentPath)) {
+      throw new Error("Parent directory does not exist");
+    }
+
+    // Check if folder already exists
+    if (fs.existsSync(newFolderPath)) {
+      throw new Error("Folder already exists");
+    }
+
+    // Validate folder name (no special characters that could cause issues)
+    if (!/^[a-zA-Z0-9._\- ]+$/.test(folderName)) {
+      throw new Error("Invalid folder name. Only alphanumeric characters, spaces, dots, hyphens, and underscores are allowed");
+    }
+
+    // Create the directory
+    fs.mkdirSync(newFolderPath, { recursive: true });
+
+    // Return the relative path to the new folder
+    return path.join(relativePath, folderName);
+  }
+
+  /**
+   * Rename a directory
+   */
+  renameDirectory(relativePath: string, newFolderName: string): string {
+    const videoBasePath = process.env.VIDEO_BASE_PATH || "/videos";
+    const oldFolderPath = path.join(videoBasePath, relativePath);
+    const parentPath = path.dirname(oldFolderPath);
+    const newFolderPath = path.join(parentPath, newFolderName);
+
+    // Security: Prevent directory traversal
+    const normalizedOld = path.normalize(oldFolderPath);
+    const normalizedNew = path.normalize(newFolderPath);
+    const normalizedBase = path.normalize(videoBasePath);
+
+    if (!normalizedOld.startsWith(normalizedBase) || !normalizedNew.startsWith(normalizedBase)) {
+      throw new Error("Invalid path");
+    }
+
+    // Check if source folder exists
+    if (!fs.existsSync(oldFolderPath)) {
+      throw new Error("Folder does not exist");
+    }
+
+    // Check if it's actually a directory
+    const stat = fs.statSync(oldFolderPath);
+    if (!stat.isDirectory()) {
+      throw new Error("Path is not a directory");
+    }
+
+    // Check if target folder already exists
+    if (fs.existsSync(newFolderPath)) {
+      throw new Error("A folder with this name already exists");
+    }
+
+    // Validate folder name (no special characters that could cause issues)
+    if (!/^[a-zA-Z0-9._\- ]+$/.test(newFolderName)) {
+      throw new Error("Invalid folder name. Only alphanumeric characters, spaces, dots, hyphens, and underscores are allowed");
+    }
+
+    // Rename the directory
+    fs.renameSync(oldFolderPath, newFolderPath);
+
+    // Return the new relative path
+    const relativeParent = relativePath.split("/").slice(0, -1).join("/");
+    return relativeParent ? path.join(relativeParent, newFolderName) : newFolderName;
+  }
+
+  /**
    * Delete a video file from a folder
    */
   deleteVideo(folderPath: string, fileName: string): boolean {
