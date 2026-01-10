@@ -27,10 +27,6 @@ RUN mkdir -p /app/data /videos
 COPY --from=builder /app/.output ./.output
 COPY --from=builder /app/package.json .
 
-# Copy update script and make it executable
-COPY update.sh /app/update.sh
-RUN chmod +x /app/update.sh
-
 # Set environment variables
 ENV NODE_ENV=production
 ENV DATA_PATH=/app/data
@@ -38,12 +34,6 @@ ENV OBS_WEBSOCKET_URL=ws://host.docker.internal:4455
 ENV OBS_WEBSOCKET_PASSWORD=rtvserver
 ENV VIDEO_BASE_PATH=/videos
 ENV PORT=3000
-# Docker self-update configuration (override these when running container)
-ENV DOCKER_IMAGE_NAME=ghcr.io/thijsongithub/video-playout-repo/kabelkrant-manager-web
-ENV DOCKER_IMAGE_TAG=latest
-ENV DOCKER_CONTAINER_NAME=kabelkrant-manager-web
-# Admin update endpoint password (CHANGE THIS!)
-ENV UPDATE_PASSWORD=changeme
 
 # Expose the port
 EXPOSE 3000
