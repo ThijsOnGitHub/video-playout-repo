@@ -11,7 +11,7 @@ interface UseVideoUploadReturn {
   isUploading: boolean;
   uploadProgress: UploadProgressState | null;
   uploadFiles: (files: FileList) => Promise<void>;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  fileInputRef: React.RefObject<HTMLInputElement>;
   handleFileInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
