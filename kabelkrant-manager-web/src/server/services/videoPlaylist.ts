@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import type { Playout } from "@/lib/types/Playout";
+import type { Playout } from "@/lib/types/playout";
 import type { ObsManager } from "./obsManager";
 
 export class VideoPlaylist extends EventEmitter {

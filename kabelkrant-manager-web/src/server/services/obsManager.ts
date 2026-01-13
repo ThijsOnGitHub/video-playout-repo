@@ -1,6 +1,6 @@
 import OBSWebSocket from "obs-websocket-js";
 import { EventEmitter } from "events";
-import type { Playout } from "@/lib/types/Playout";
+import type { Playout } from "@/lib/types/playout";
 
 const KABELKRANT_SCENE = "Kabelkrant";
 const RADIO_INPUT = "Radio";
