@@ -20,6 +20,7 @@ export interface VideoItem {
   iframeMuted?: boolean; // Of de audio gedempt moet worden (standaard true)
   // Raadsvergadering (CompanyWebcast) specific
   webcastId?: string; // CompanyWebcast ID, e.g., "abc5703d-b1f7-46d6-9ef9-4a224001f8e6"
+  webcastCode?: string; // CompanyWebcast code, e.g., "gemeentekrimpenerwaard/20260106_1"
 }
 
 export interface Planning {
