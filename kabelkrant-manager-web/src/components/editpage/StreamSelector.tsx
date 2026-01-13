@@ -47,7 +47,7 @@ export function StreamSelector({ onStreamSelect, currentWebcastId, customer = "g
   const handleSelectStream = async () => {
     if (!selectedStreamId) return;
 
-    const stream = streams.find((s) => s.id === selectedStreamId);
+    const stream = streams.find((s: CompanyWebcastStream) => s.id === selectedStreamId);
     if (!stream) return;
 
     // Parse the /Date(timestamp)/ format
