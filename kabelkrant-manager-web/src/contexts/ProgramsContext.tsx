@@ -5,6 +5,8 @@ interface ProgramsContextValue {
   programs: VideoItem[];
   setPrograms: (programs: VideoItem[]) => void;
   selectedIndex: number;
+  saveError: string | null;
+  clearSaveError: () => void;
 }
 
 export const ProgramsContext = createContext<ProgramsContextValue | null>(null);

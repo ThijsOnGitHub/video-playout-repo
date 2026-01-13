@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, useNavigate, useParams } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { v4 } from "uuid";
 import { TopBar } from "@/components/topBar";
 import { Sidebar } from "@/components/sidebar/sidebar";
@@ -27,8 +27,13 @@ function ProgramsLayout() {
 
   const [programs, setPrograms] = useState<VideoItem[]>(initialPrograms);
   const [firstRender, setFirstRender] = useState(true);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const selectedIndex = programs.findIndex((p) => p.id === programId);
+
+  const clearSaveError = useCallback(() => {
+    setSaveError(null);
+  }, []);
 
   function addProgram() {
     const newProgram: VideoItem = {
@@ -58,8 +63,20 @@ function ProgramsLayout() {
       setFirstRender(false);
       return;
     }
-    console.log("saving programs");
-    savePrograms({ data: programs });
+
+    const doSave = async () => {
+      try {
+        setSaveError(null);
+        console.log("saving programs");
+        await savePrograms({ data: programs });
+      } catch (error) {
+        console.error("Error saving programs:", error);
+        const errorMessage = error instanceof Error ? error.message : "Onbekende fout bij opslaan";
+        setSaveError(errorMessage);
+      }
+    };
+
+    doSave();
   }, [programs, firstRender]);
 
   const sidebarItems = useSidebarItems({
@@ -71,7 +88,7 @@ function ProgramsLayout() {
   });
 
   return (
-    <ProgramsContext.Provider value={{ programs, setPrograms, selectedIndex }}>
+    <ProgramsContext.Provider value={{ programs, setPrograms, selectedIndex, saveError, clearSaveError }}>
       <div>
         <TopBar>{playoutMode === "obs" && !obsConnected && <div style={{ color: "red", height: "100%" }}>OBS is niet geopend, dit kan problemen geven</div>}</TopBar>
         <div className="flex gap-5">
