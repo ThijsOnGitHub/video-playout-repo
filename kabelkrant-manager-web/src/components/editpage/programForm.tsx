@@ -2,7 +2,7 @@ import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash2, Undo2, Redo2, Save, Check, CalendarClock, Globe, Video } from "lucide-react";
+import { Trash2, Undo2, Redo2, Save, Check, CalendarClock, Globe, Video, AlertCircle, X } from "lucide-react";
 import { FormItem } from "@/components/formItem";
 import { FormField } from "@/components/ui/form";
 import { FolderPicker } from "@/components/FolderPicker/FolderPicker";
@@ -19,6 +19,7 @@ import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { VideoManager } from "./VideoManager";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StreamSelector } from "./StreamSelector";
+import { useProgramsContext } from "@/contexts/ProgramsContext";
 
 export interface ProgramFormProps {
   value: ProgramFormSchema;
@@ -28,6 +29,7 @@ export interface ProgramFormProps {
 const AUTOSAVE_DELAY = 1000; // 1 second delay for autosave
 
 export const ProgramForm: React.FC<ProgramFormProps> = ({ value, onSubmit }) => {
+  const { saveError, clearSaveError } = useProgramsContext();
   const { register, control, watch, reset, setValue } = useForm<ProgramFormSchema>({
     resolver: zodResolver(programSchema),
     defaultValues: value,
@@ -40,6 +42,13 @@ export const ProgramForm: React.FC<ProgramFormProps> = ({ value, onSubmit }) => 
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isInternalUpdateRef = useRef(false);
   const lastFormValueRef = useRef<string>(JSON.stringify(value));
+  const pendingDataRef = useRef<ProgramFormSchema | null>(null);
+  const onSubmitRef = useRef(onSubmit);
+
+  // Keep onSubmit ref updated to avoid stale closure
+  useEffect(() => {
+    onSubmitRef.current = onSubmit;
+  }, [onSubmit]);
 
   // Undo/Redo history
   const { value: historyValue, setValue: addToHistory, undo, redo, canUndo, canRedo, reset: resetHistory } = useUndoRedo<ProgramFormSchema>(value, { debounceMs: 300, maxHistorySize: 50 });
@@ -51,9 +60,17 @@ export const ProgramForm: React.FC<ProgramFormProps> = ({ value, onSubmit }) => 
   useEffect(() => {
     // Only reset if we switched to a different program
     if (value.id !== currentProgramIdRef.current) {
+      // Cancel any pending autosave when switching programs
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+      pendingDataRef.current = null;
+
       currentProgramIdRef.current = value.id;
       isInternalUpdateRef.current = true;
       lastFormValueRef.current = JSON.stringify(value);
+      setSaveStatus("idle");
       setTimeout(() => {
         reset(value);
         resetHistory(value);
@@ -111,17 +128,24 @@ export const ProgramForm: React.FC<ProgramFormProps> = ({ value, onSubmit }) => 
         clearTimeout(autosaveTimerRef.current);
       }
 
+      // Store the latest data in ref to avoid stale closure
+      pendingDataRef.current = data;
       setSaveStatus("saving");
 
       // Set new timer for autosave
       autosaveTimerRef.current = setTimeout(() => {
-        onSubmit(data);
+        // Use the latest data from ref, not the closure
+        const dataToSave = pendingDataRef.current;
+        if (dataToSave) {
+          onSubmitRef.current(dataToSave);
+          pendingDataRef.current = null;
+        }
         setSaveStatus("saved");
         // Reset status after a short delay
         setTimeout(() => setSaveStatus("idle"), 1500);
       }, AUTOSAVE_DELAY);
     },
-    [onSubmit]
+    [] // No dependencies needed since we use refs
   );
 
   // Cleanup autosave timer on unmount
@@ -188,15 +212,28 @@ export const ProgramForm: React.FC<ProgramFormProps> = ({ value, onSubmit }) => 
               <span>Opslaan...</span>
             </>
           )}
-          {saveStatus === "saved" && (
+          {saveStatus === "saved" && !saveError && (
             <>
               <Check className="h-4 w-4 text-green-500" />
               <span className="text-green-500">Opgeslagen</span>
             </>
           )}
-          {saveStatus === "idle" && <span>Automatisch opslaan aan</span>}
+          {saveStatus === "idle" && !saveError && <span>Automatisch opslaan aan</span>}
         </div>
       </div>
+
+      {/* Error message display */}
+      {saveError && (
+        <div className="flex items-center justify-between gap-2 p-3 bg-red-50 border border-red-200 rounded-md text-red-700">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            <span className="text-sm">Fout bij opslaan: {saveError}</span>
+          </div>
+          <Button variant="ghost" size="sm" onClick={clearSaveError} className="h-6 w-6 p-0 hover:bg-red-100">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         <FormItem labelWidth={width} label="Programma titel">
