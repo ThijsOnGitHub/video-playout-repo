@@ -17,10 +17,19 @@ function ProgramDetail() {
     return <div className="text-center text-gray-500 h-full flex flex-col justify-center">Programma niet gevonden</div>;
   }
 
+  // Ensure default values for optional fields that are required by the form schema
+  const formValue = {
+    ...selectedItem,
+    scheduledDates: selectedItem.scheduledDates ?? [],
+    programType: selectedItem.programType ?? "video",
+    iframeDurationSeconds: selectedItem.iframeDurationSeconds ?? 60,
+    iframeMuted: selectedItem.iframeMuted ?? true,
+  };
+
   return (
     <ProgramForm
       key={selectedItem.id}
-      value={selectedItem}
+      value={formValue}
       onSubmit={(data) => {
         const newPrograms = [...programs];
         newPrograms[selectedIndex] = data;
