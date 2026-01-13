@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { Calendar, Play, Settings, FileVideo } from "lucide-react";
 import { SidebarItemTypes, type SidebarItems, type SidebarItemProgram } from "@/components/sidebar/sidebar";
 import type { VideoItem } from "@/lib/types/VideoItem";
 
@@ -30,6 +31,7 @@ export function useSidebarItems({ programs, activePage, selectedProgramId, onAdd
             navigate({ to: "/programs/$programId", params: { programId: program.id } });
           },
           onDelete: onDeleteProgram ? () => onDeleteProgram(index) : undefined,
+          icon: FileVideo,
         })),
         {
           type: SidebarItemTypes.BUTTON,
@@ -44,18 +46,21 @@ export function useSidebarItems({ programs, activePage, selectedProgramId, onAdd
           text: "Planning",
           isSelected: activePage === "planning",
           onClick: activePage === "planning" ? () => {} : () => navigate({ to: "/planning" }),
+          icon: Calendar,
         },
         {
           type: SidebarItemTypes.BUTTON,
           text: "Speelt nu af",
           isSelected: activePage === "playlist",
           onClick: activePage === "playlist" ? () => {} : () => navigate({ to: "/playlist" }),
+          icon: Play,
         },
         {
           type: SidebarItemTypes.BUTTON,
           text: "Instellingen",
           isSelected: activePage === "settings",
           onClick: activePage === "settings" ? () => {} : () => navigate({ to: "/settings" }),
+          icon: Settings,
         },
       ],
     }),

@@ -1,5 +1,6 @@
 import type { FC, ReactNode, HTMLAttributes, DetailedHTMLProps } from "react";
 import { useState } from "react";
+import type { LucideIcon } from "lucide-react";
 import { Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog/DeleteConfirmDialog";
@@ -10,6 +11,7 @@ export interface SidebarItemProps {
   children?: ReactNode;
   showDelete?: boolean;
   onDelete?: () => void;
+  icon?: LucideIcon;
 }
 
 export const SidebarItem: FC<SidebarItemProps & DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>> = ({
@@ -18,6 +20,7 @@ export const SidebarItem: FC<SidebarItemProps & DetailedHTMLProps<HTMLAttributes
   isAdd = false,
   showDelete = false,
   onDelete,
+  icon: Icon,
   className,
   ...props
 }) => {
@@ -38,7 +41,8 @@ export const SidebarItem: FC<SidebarItemProps & DetailedHTMLProps<HTMLAttributes
           className
         )}
       >
-        {isAdd && <Plus className="h-4 w-4 flex-shrink-0" />}
+        {isAdd && !Icon && <Plus className="h-4 w-4 flex-shrink-0" />}
+        {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
         <span className="flex-1 truncate">{children}</span>
         {showDelete && (
           <Trash2

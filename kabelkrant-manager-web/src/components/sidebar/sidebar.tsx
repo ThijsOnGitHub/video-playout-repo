@@ -1,4 +1,5 @@
 import type { FC } from "react";
+import type { LucideIcon } from "lucide-react";
 import { SidebarItem } from "./sidebarItem";
 import type { VideoItem } from "@/lib/types/VideoItem";
 
@@ -14,6 +15,7 @@ export type SidebarItemProgram = {
   isSelected: boolean;
   onClick: () => void;
   onDelete?: () => void;
+  icon?: LucideIcon;
 };
 
 export type SidebarItemButton = {
@@ -22,6 +24,7 @@ export type SidebarItemButton = {
   isAdd?: boolean;
   isSelected?: boolean;
   onClick: () => void;
+  icon?: LucideIcon;
 };
 
 export type SidebarItemType = SidebarItemProgram | SidebarItemButton;
@@ -42,14 +45,14 @@ export const Sidebar: FC<SidebarProps> = ({ items }) => {
             {categoryItems.map((item, index) => {
               if (item.type === SidebarItemTypes.BUTTON) {
                 return (
-                  <SidebarItem key={`button-${index}`} isAdd={item.isAdd} isSelected={item.isSelected} onClick={item.onClick}>
+                  <SidebarItem key={`button-${index}`} isAdd={item.isAdd} isSelected={item.isSelected} onClick={item.onClick} icon={item.icon}>
                     {item.text}
                   </SidebarItem>
                 );
               }
               if (item.type === SidebarItemTypes.PROGRAM) {
                 return (
-                  <SidebarItem key={item.value.id} onDelete={item.onDelete} showDelete={item.onDelete != null} onClick={item.onClick} isSelected={item.isSelected}>
+                  <SidebarItem key={item.value.id} onDelete={item.onDelete} showDelete={item.onDelete != null} onClick={item.onClick} isSelected={item.isSelected} icon={item.icon}>
                     {item.value.programName}
                   </SidebarItem>
                 );
