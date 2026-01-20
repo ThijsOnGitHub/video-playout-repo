@@ -36,10 +36,10 @@ ENV DATA_PATH=/app/data
 ENV OBS_WEBSOCKET_URL=ws://host.docker.internal:4455
 ENV OBS_WEBSOCKET_PASSWORD=rtvserver
 ENV VIDEO_BASE_PATH=/videos
-ENV PORT=3000
+ENV PORT=80
 
 # Expose the port
-EXPOSE 3000
+EXPOSE 80
 
 # Start the server with Nitro
 CMD ["node", ".output/server/index.mjs"]
