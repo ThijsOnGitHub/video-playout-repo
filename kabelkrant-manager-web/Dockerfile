@@ -12,8 +12,11 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build argument for Sentry source map uploads
+ARG SENTRY_AUTH_TOKEN
+
+# Build the application (NODE_ENV=production enables Sentry plugin)
+RUN NODE_ENV=production npm run build
 
 # Production stage
 FROM node:22-alpine AS runner
