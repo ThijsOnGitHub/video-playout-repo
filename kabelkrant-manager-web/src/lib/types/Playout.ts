@@ -9,7 +9,7 @@ export interface Playout {
 }
 
 /** Possible states of the playout */
-export type PlayoutState = "kabelkrant" | "video" | "iframe" | "raadsvergadering";
+export type PlayoutState = "kabelkrant" | "video" | "iframe" | "raadsvergadering:waiting" | "raadsvergadering:playing";
 
 /** Video item in the playlist */
 export interface PlaylistVideoItem {

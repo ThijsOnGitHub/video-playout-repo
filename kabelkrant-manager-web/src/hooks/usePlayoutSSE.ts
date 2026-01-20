@@ -6,33 +6,75 @@ import type { PlayoutState, ClientPlaylistItem, CurrentVideo, CurrentIframe, Cur
 // Re-export types for convenience
 export type { ClientPlaylistItem, CurrentVideo, CurrentIframe, CurrentRaadsvergadering };
 
+export type ConnectionStatus = "connecting" | "connected" | "disconnected";
+
+// localStorage keys
+const STORAGE_KEY_CLIENT_ID = "playout_clientId";
+const STORAGE_KEY_PLAYLIST = "playout_playlist";
+const STORAGE_KEY_CURRENT_ITEM = "playout_currentItem";
+const STORAGE_KEY_STATE = "playout_state";
+
+// Reconnection settings
+const INITIAL_RECONNECT_DELAY = 1000; // 1 second
+const MAX_RECONNECT_DELAY = 30000; // 30 seconds
+
 interface UsePlayoutSSEReturn {
   clientId: string | null;
   currentItem: ClientPlaylistItem | null;
   playlist: ClientPlaylistItem[];
   state: PlayoutState;
   itemKey: number;
+  connectionStatus: ConnectionStatus;
   playNextItem: () => void;
   handleItemEnded: () => void;
+  /** Transition raadsvergadering from waiting to playing state */
+  handleRaadsvergaderingPlaying: () => void;
   // Typed helpers for easy access
   currentVideo: CurrentVideo | null;
   currentIframe: CurrentIframe | null;
   currentRaadsvergadering: CurrentRaadsvergadering | null;
 }
 
+// Helper functions for localStorage
+function loadFromStorage<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveToStorage<T>(key: string, value: T): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.error("[Playout] Error saving to localStorage:", e);
+  }
+}
+
 export function usePlayoutSSE(): UsePlayoutSSEReturn {
   const queryClient = useQueryClient();
-  const [clientId, setClientId] = useState<string | null>(null);
-  const [state, setState] = useState<PlayoutState>("kabelkrant");
-  const [currentItem, setCurrentItem] = useState<ClientPlaylistItem | null>(null);
-  const [itemKey, setItemKey] = useState(0);
-  const [playlist, setPlaylist] = useState<ClientPlaylistItem[]>([]);
 
-  const clientIdRef = useRef<string | null>(null);
-  const currentItemRef = useRef<ClientPlaylistItem | null>(null);
-  const playlistRef = useRef<ClientPlaylistItem[]>([]);
-  const stateRef = useRef<PlayoutState>("kabelkrant");
+  // Initialize state from localStorage for resilience
+  const [clientId, setClientId] = useState<string | null>(() => loadFromStorage(STORAGE_KEY_CLIENT_ID, null));
+  const [state, setState] = useState<PlayoutState>(() => loadFromStorage(STORAGE_KEY_STATE, "kabelkrant"));
+  const [currentItem, setCurrentItem] = useState<ClientPlaylistItem | null>(() => loadFromStorage(STORAGE_KEY_CURRENT_ITEM, null));
+  const [itemKey, setItemKey] = useState(0);
+  const [playlist, setPlaylist] = useState<ClientPlaylistItem[]>(() => loadFromStorage(STORAGE_KEY_PLAYLIST, []));
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
+
+  const clientIdRef = useRef<string | null>(clientId);
+  const currentItemRef = useRef<ClientPlaylistItem | null>(currentItem);
+  const playlistRef = useRef<ClientPlaylistItem[]>(playlist);
+  const stateRef = useRef<PlayoutState>(state);
   const playNextItemRef = useRef<() => void>(() => {});
+  const handleRaadsvergaderingPlayingRef = useRef<() => void>(() => {});
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -50,6 +92,39 @@ export function usePlayoutSSE(): UsePlayoutSSEReturn {
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  // Persist state to localStorage for resilience during reconnection
+  useEffect(() => {
+    saveToStorage(STORAGE_KEY_CLIENT_ID, clientId);
+  }, [clientId]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEY_PLAYLIST, playlist);
+  }, [playlist]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEY_CURRENT_ITEM, currentItem);
+  }, [currentItem]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEY_STATE, state);
+  }, [state]);
+
+  // Clear localStorage on intentional page close (not network disconnect)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Clear stored state so next visit starts fresh
+      localStorage.removeItem(STORAGE_KEY_CLIENT_ID);
+      localStorage.removeItem(STORAGE_KEY_PLAYLIST);
+      localStorage.removeItem(STORAGE_KEY_CURRENT_ITEM);
+      localStorage.removeItem(STORAGE_KEY_STATE);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
 
   // Report status to server when state changes
   const reportStatus = useCallback(() => {
@@ -103,7 +178,8 @@ export function usePlayoutSSE(): UsePlayoutSSEReturn {
       setPlaylist(remainingPlaylist);
       setCurrentItem(nextItem);
       setItemKey((k) => k + 1);
-      setState("raadsvergadering");
+      // Start in waiting state - will transition to playing when stream actually starts
+      setState("raadsvergadering:waiting");
     }
   }, []);
 
@@ -118,20 +194,63 @@ export function usePlayoutSSE(): UsePlayoutSSEReturn {
     playNextItem();
   }, [playNextItem]);
 
-  // Setup SSE connection
-  useEffect(() => {
-    console.log("[Playout] Setting up SSE connection...");
-    const eventSource = new EventSource("/api/playout/events");
+  // Handle raadsvergadering transitioning from waiting to playing
+  const handleRaadsvergaderingPlaying = useCallback(() => {
+    if (stateRef.current === "raadsvergadering:waiting") {
+      console.log("[Playout] Raadsvergadering stream started playing, transitioning to playing state");
+      setState("raadsvergadering:playing");
+    }
+  }, []);
 
-    eventSource.addEventListener("connected", (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log("[Playout] SSE connected, clientId:", data.clientId);
-        setClientId(data.clientId);
-      } catch (e) {
-        console.error("[Playout] Error parsing connected event:", e);
-      }
-    });
+  // Keep ref updated for use in event listeners
+  useEffect(() => {
+    handleRaadsvergaderingPlayingRef.current = handleRaadsvergaderingPlaying;
+  }, [handleRaadsvergaderingPlaying]);
+
+  // Setup SSE connection with automatic reconnection
+  useEffect(() => {
+    let isCleanedUp = false;
+
+    const connect = () => {
+      if (isCleanedUp) return;
+
+      // Build SSE URL with optional clientId for reconnection
+      const storedClientId = clientIdRef.current;
+      const sseUrl = storedClientId
+        ? `/api/playout/events?clientId=${encodeURIComponent(storedClientId)}`
+        : "/api/playout/events";
+
+      console.log("[Playout] Setting up SSE connection...", storedClientId ? `(reconnecting as ${storedClientId})` : "(new connection)");
+      setConnectionStatus("connecting");
+
+      const eventSource = new EventSource(sseUrl);
+      eventSourceRef.current = eventSource;
+
+      eventSource.addEventListener("connected", (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log("[Playout] SSE connected, clientId:", data.clientId, "restored:", data.restored);
+          setClientId(data.clientId);
+          setConnectionStatus("connected");
+
+          // Reset reconnection delay on successful connection
+          reconnectDelayRef.current = INITIAL_RECONNECT_DELAY;
+
+          // If server restored our state, update from server
+          if (data.restored) {
+            console.log("[Playout] Restoring state from server:", {
+              state: data.state,
+              currentItem: data.currentItem,
+              playlist: data.playlist,
+            });
+            if (data.state) setState(data.state);
+            if (data.currentItem !== undefined) setCurrentItem(data.currentItem);
+            if (data.playlist !== undefined) setPlaylist(data.playlist);
+          }
+        } catch (e) {
+          console.error("[Playout] Error parsing connected event:", e);
+        }
+      });
 
     eventSource.addEventListener("addVideos", (event) => {
       console.log("[Playout] Received addVideos event:", event.data);
@@ -160,7 +279,9 @@ export function usePlayoutSSE(): UsePlayoutSSEReturn {
             const [firstItem, ...rest] = newItems;
             console.log("[Playout] Nothing playing, starting first item:", firstItem);
             setItemKey((k) => k + 1);
-            setState(firstItem.type);
+            // For raadsvergadering, start in waiting state
+            const newState = firstItem.type === "raadsvergadering" ? "raadsvergadering:waiting" : firstItem.type;
+            setState(newState);
             setCurrentItem(firstItem);
             setPlaylist(rest);
           } else {
@@ -222,10 +343,10 @@ export function usePlayoutSSE(): UsePlayoutSSEReturn {
           };
 
           if (currentItemRef.current === null) {
-            // Nothing playing, start immediately
-            console.log("[Playout] Starting raadsvergadering immediately:", newItem);
+            // Nothing playing, start immediately in waiting state
+            console.log("[Playout] Starting raadsvergadering immediately (waiting state):", newItem);
             setItemKey((k) => k + 1);
-            setState("raadsvergadering");
+            setState("raadsvergadering:waiting");
             setCurrentItem(newItem);
           } else {
             // Add to playlist queue
@@ -264,6 +385,12 @@ export function usePlayoutSSE(): UsePlayoutSSEReturn {
       playNextItemRef.current();
     });
 
+    eventSource.addEventListener("forceStartStream", () => {
+      console.log("[Playout] Received forceStartStream event - manually starting stream");
+      // Force transition from waiting to playing state
+      handleRaadsvergaderingPlayingRef.current();
+    });
+
     eventSource.addEventListener("settingsUpdate", (event) => {
       console.log("[Playout] Received settingsUpdate event:", event.data);
       try {
@@ -277,13 +404,44 @@ export function usePlayoutSSE(): UsePlayoutSSEReturn {
       }
     });
 
-    eventSource.onerror = (error) => {
-      console.error("[Playout] SSE error:", error);
+      eventSource.onerror = (error) => {
+        console.error("[Playout] SSE error:", error);
+        setConnectionStatus("disconnected");
+
+        // Close the current connection
+        eventSource.close();
+        eventSourceRef.current = null;
+
+        if (!isCleanedUp) {
+          // Schedule reconnection with exponential backoff
+          const delay = reconnectDelayRef.current;
+          console.log(`[Playout] Reconnecting in ${delay}ms...`);
+
+          reconnectTimeoutRef.current = setTimeout(() => {
+            // Increase delay for next attempt (exponential backoff with max)
+            reconnectDelayRef.current = Math.min(delay * 2, MAX_RECONNECT_DELAY);
+            connect();
+          }, delay);
+        }
+      };
     };
+
+    // Initial connection
+    connect();
 
     return () => {
       console.log("[Playout] Closing SSE connection");
-      eventSource.close();
+      isCleanedUp = true;
+
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
     };
   }, [queryClient]);
 
@@ -318,8 +476,10 @@ export function usePlayoutSSE(): UsePlayoutSSEReturn {
     playlist,
     state,
     itemKey,
+    connectionStatus,
     playNextItem,
     handleItemEnded,
+    handleRaadsvergaderingPlaying,
     currentVideo,
     currentIframe,
     currentRaadsvergadering,

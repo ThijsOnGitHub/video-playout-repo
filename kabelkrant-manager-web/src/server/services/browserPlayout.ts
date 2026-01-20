@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import type { PlayoutSettings } from "@/lib/types/PlayoutSettings";
 
 export interface BrowserPlayoutEvent {
-  type: "addVideos" | "addIframe" | "addRaadsvergadering" | "clearPlaylist" | "removeItem" | "stopCurrent" | "currentPlaylist" | "settingsUpdate";
+  type: "addVideos" | "addIframe" | "addRaadsvergadering" | "clearPlaylist" | "removeItem" | "stopCurrent" | "currentPlaylist" | "settingsUpdate" | "forceStartStream";
   data?: unknown;
 }
 
@@ -71,7 +71,7 @@ export interface ClientStatus {
   currentVideo: VideoItem | null;
   currentItem: PlaylistItem | null;
   playlist: PlaylistItem[];
-  state: "kabelkrant" | "video" | "iframe" | "raadsvergadering";
+  state: "kabelkrant" | "video" | "iframe" | "raadsvergadering:waiting" | "raadsvergadering:playing";
 }
 
 /** Client info stored on server */
@@ -81,11 +81,21 @@ interface ConnectedClient {
   status: ClientStatus;
 }
 
+/** Disconnected client info stored for reconnection */
+interface DisconnectedClient {
+  id: string;
+  status: ClientStatus;
+  disconnectedAt: Date;
+}
+
 /** Admin listener for status updates */
 interface AdminListener {
   id: string;
   callback: (event: AdminStatusEvent) => void;
 }
+
+/** Grace period for reconnection (5 minutes) */
+const GRACE_PERIOD_MS = 5 * 60 * 1000;
 
 /**
  * BrowserPlayout manages video playback for browser-based playout clients.
@@ -95,18 +105,66 @@ interface AdminListener {
  */
 export class BrowserPlayout extends EventEmitter {
   private connectedClients: Map<string, ConnectedClient> = new Map();
+  private disconnectedClients: Map<string, DisconnectedClient> = new Map();
   private adminListeners: Map<string, AdminListener> = new Map();
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     super();
     console.log("[BrowserPlayout] Constructor called");
+    // Start cleanup interval for expired disconnected clients
+    this.cleanupInterval = setInterval(() => this.cleanupExpiredClients(), 60 * 1000); // Check every minute
   }
 
-  /** Register a client to receive events, returns client ID */
-  addClient(callback: (event: BrowserPlayoutEvent) => void): string {
-    const clientId = randomUUID();
+  /** Cleanup expired clients from the disconnected pool */
+  private cleanupExpiredClients(): void {
+    const now = Date.now();
+    let removed = 0;
+    for (const [clientId, client] of this.disconnectedClients) {
+      if (now - client.disconnectedAt.getTime() > GRACE_PERIOD_MS) {
+        this.disconnectedClients.delete(clientId);
+        removed++;
+        console.log(`[BrowserPlayout] Removed expired disconnected client ${clientId}`);
+      }
+    }
+    if (removed > 0) {
+      console.log(`[BrowserPlayout] Cleaned up ${removed} expired clients. Disconnected pool size: ${this.disconnectedClients.size}`);
+    }
+  }
+
+  /** Register a client to receive events, returns client ID and restored state if reconnecting */
+  addClient(callback: (event: BrowserPlayoutEvent) => void, requestedClientId?: string): { clientId: string; restored: boolean; status?: ClientStatus } {
     const now = new Date();
 
+    // Check if this is a reconnection attempt
+    if (requestedClientId) {
+      const disconnectedClient = this.disconnectedClients.get(requestedClientId);
+      if (disconnectedClient) {
+        // Restore client from disconnected pool
+        this.disconnectedClients.delete(requestedClientId);
+
+        const client: ConnectedClient = {
+          id: requestedClientId,
+          callback,
+          status: {
+            ...disconnectedClient.status,
+            lastHeartbeat: now,
+          },
+        };
+
+        this.connectedClients.set(requestedClientId, client);
+        console.log(`[BrowserPlayout] Client ${requestedClientId} reconnected and restored. Total clients: ${this.connectedClients.size}`);
+
+        this.emit("clientsChanged", this.getAllClientStatuses());
+        this.broadcastToAdmins({ type: "clientsUpdate", data: { clients: this.getAllClientStatuses() } });
+
+        return { clientId: requestedClientId, restored: true, status: client.status };
+      }
+      console.log(`[BrowserPlayout] Client ${requestedClientId} tried to reconnect but was not in disconnected pool`);
+    }
+
+    // Create new client
+    const clientId = randomUUID();
     const client: ConnectedClient = {
       id: clientId,
       callback,
@@ -127,13 +185,23 @@ export class BrowserPlayout extends EventEmitter {
     this.emit("clientsChanged", this.getAllClientStatuses());
     this.broadcastToAdmins({ type: "clientsUpdate", data: { clients: this.getAllClientStatuses() } });
 
-    return clientId;
+    return { clientId, restored: false };
   }
 
-  /** Remove a client */
+  /** Remove a client - moves to disconnected pool for potential reconnection */
   removeClient(clientId: string): void {
+    const client = this.connectedClients.get(clientId);
+    if (client) {
+      // Move to disconnected pool for potential reconnection
+      this.disconnectedClients.set(clientId, {
+        id: clientId,
+        status: client.status,
+        disconnectedAt: new Date(),
+      });
+      console.log(`[BrowserPlayout] Client ${clientId} moved to disconnected pool. Pool size: ${this.disconnectedClients.size}`);
+    }
     this.connectedClients.delete(clientId);
-    console.log(`[BrowserPlayout] Client ${clientId} disconnected. Total clients: ${this.connectedClients.size}`);
+    console.log(`[BrowserPlayout] Client ${clientId} disconnected. Total connected clients: ${this.connectedClients.size}`);
     this.emit("clientsChanged", this.getAllClientStatuses());
     this.broadcastToAdmins({ type: "clientsUpdate", data: { clients: this.getAllClientStatuses() } });
   }
@@ -277,6 +345,15 @@ export class BrowserPlayout extends EventEmitter {
     });
   }
 
+  /** Force start stream for a specific client (manual trigger for raadsvergadering) */
+  forceStartStream(clientId: string): boolean {
+    console.log(`[BrowserPlayout] Force starting stream for client ${clientId}`);
+
+    return this.sendToClient(clientId, {
+      type: "forceStartStream",
+    });
+  }
+
   /** Get number of connected clients */
   getClientCount(): number {
     return this.connectedClients.size;
@@ -360,7 +437,12 @@ export class BrowserPlayout extends EventEmitter {
   /** Cleanup */
   cleanup(): void {
     console.log("[BrowserPlayout] Cleaning up");
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
     this.connectedClients.clear();
+    this.disconnectedClients.clear();
     globalThis.__browserPlayoutInstance = undefined;
   }
 }

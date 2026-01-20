@@ -85,3 +85,12 @@ export const stopCurrentItem = createServerFn({ method: "POST" })
     const success = browserPlayout.stopCurrentItem(data.clientId);
     return { success };
   });
+
+// Force start stream on client (manual trigger for raadsvergadering)
+export const forceStartStream = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ clientId: z.string() }))
+  .handler(async ({ data }) => {
+    const browserPlayout = getBrowserPlayout();
+    const success = browserPlayout.forceStartStream(data.clientId);
+    return { success };
+  });

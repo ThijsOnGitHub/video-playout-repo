@@ -10,10 +10,15 @@ interface KabelkrantLayerProps {
 
 /**
  * Kabelkrant iframe layer - always mounted but hidden when other content is playing
+ * Note: stays visible during raadsvergadering:waiting, only hides when :playing
  */
 export function KabelkrantLayer({ settings, state, kabelkrantRef }: KabelkrantLayerProps) {
-  const isHidden = state === "video" || state === "iframe" || state === "raadsvergadering";
+  const isHidden = state === "video" || state === "iframe" || state === "raadsvergadering:playing";
 
+
+
+
+  
   if (!settings?.kabelkrantUrl) {
     // Show placeholder when no kabelkrant URL is set
     if (state === "kabelkrant") {
@@ -80,13 +85,28 @@ interface RaadsvergaderingLayerProps {
 
 /**
  * Raadsvergadering layer - container for CompanyWebcast player
+ * Renders at both :waiting and :playing states (for iframe preloading), but only visible at :playing
  */
 export function RaadsvergaderingLayer({ currentRaadsvergadering, state, itemKey, containerRef }: RaadsvergaderingLayerProps) {
-  if (state !== "raadsvergadering" || !currentRaadsvergadering) {
+  const isRaadsvergaderingState = state === "raadsvergadering:waiting" || state === "raadsvergadering:playing";
+  if (!isRaadsvergaderingState || !currentRaadsvergadering) {
     return null;
   }
 
-  return <div ref={containerRef as RefObject<HTMLDivElement>} key={`raadsvergadering-${itemKey}`} className="absolute inset-0 w-full h-full" style={{ zIndex: 2 }} />;
+  const isVisible = state === "raadsvergadering:playing";
+
+  return (
+    <div
+      ref={containerRef as RefObject<HTMLDivElement>}
+      key={`raadsvergadering-${itemKey}`}
+      className="absolute inset-0 w-full h-full"
+      style={{
+        zIndex: isVisible ? 2 : -1,
+        opacity: isVisible ? 1 : 0,
+        pointerEvents: isVisible ? "auto" : "none",
+      }}
+    />
+  );
 }
 
 interface VideoLayerProps {

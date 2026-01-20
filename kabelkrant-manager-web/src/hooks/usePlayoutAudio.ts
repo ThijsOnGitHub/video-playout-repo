@@ -4,7 +4,7 @@ import type { PlayoutSettings } from "@/lib/types/PlayoutSettings";
 interface UsePlayoutAudioOptions {
   settings: PlayoutSettings | undefined;
   isActivated: boolean;
-  state: "kabelkrant" | "video" | "iframe" | "raadsvergadering";
+  state: "kabelkrant" | "video" | "iframe" | "raadsvergadering:waiting" | "raadsvergadering:playing";
   videoRef: React.RefObject<HTMLVideoElement | null>;
   /** When true, the iframe has no audio so radio can continue playing */
   iframeMuted?: boolean;
@@ -43,11 +43,11 @@ export function usePlayoutAudio({ settings, isActivated, state, videoRef, iframe
 
     // Fade radio/mic audio:
     // - Always mute during video playback
-    // - Always mute during raadsvergadering (it has its own audio)
+    // - Mute during raadsvergadering:playing (it has its own audio), but NOT during :waiting
     // - During iframe: mute radio if iframeMuted is true (iframe wants silence from radio)
     if (gainNodeRef.current && microphoneEnabled) {
       const shouldMuteForIframe = state === "iframe" && iframeMuted;
-      const shouldMuteRadio = state === "video" || state === "raadsvergadering" || shouldMuteForIframe;
+      const shouldMuteRadio = state === "video" || state === "raadsvergadering:playing" || shouldMuteForIframe;
       const radioTargetGain = shouldMuteRadio ? 0 : 1;
       gainNodeRef.current.gain.cancelScheduledValues(currentTime);
       gainNodeRef.current.gain.setValueAtTime(gainNodeRef.current.gain.value, currentTime);

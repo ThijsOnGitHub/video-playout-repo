@@ -52,8 +52,28 @@ export function PlayoutControls({
         <div className="flex items-center gap-4 text-sm">
           <span className="text-gray-400">
             Status:{" "}
-            <span className={state === "video" ? "text-green-400" : state === "iframe" ? "text-purple-400" : state === "raadsvergadering" ? "text-orange-400" : "text-blue-400"}>
-              {state === "video" ? "Video" : state === "iframe" ? "Iframe" : state === "raadsvergadering" ? "Raadsvergadering" : "Kabelkrant"}
+            <span
+              className={
+                state === "video"
+                  ? "text-green-400"
+                  : state === "iframe"
+                    ? "text-purple-400"
+                    : state === "raadsvergadering:waiting"
+                      ? "text-yellow-400"
+                      : state === "raadsvergadering:playing"
+                        ? "text-orange-400"
+                        : "text-blue-400"
+              }
+            >
+              {state === "video"
+                ? "Video"
+                : state === "iframe"
+                  ? "Iframe"
+                  : state === "raadsvergadering:waiting"
+                    ? "Wachten op stream..."
+                    : state === "raadsvergadering:playing"
+                      ? "Raadsvergadering"
+                      : "Kabelkrant"}
             </span>
           </span>
           {(playlist.length > 0 || isPlaying) && (

@@ -35,6 +35,8 @@ export async function handleApiRoutes(request: Request): Promise<Response | null
     return handleClientStatusUpdate(request);
   }
 
+  
+
   // Get all client statuses
   if (pathname === "/api/playout/clients" && request.method === "GET") {
     return handleGetClients();
@@ -71,6 +73,8 @@ export async function handleApiRoutes(request: Request): Promise<Response | null
  */
 function handlePlayoutSSE(request: Request): Response {
   const browserPlayout = getBrowserPlayout();
+  const url = new URL(request.url);
+  const requestedClientId = url.searchParams.get("clientId") || undefined;
   let clientId: string | null = null;
 
   // Create a readable stream for SSE
@@ -88,11 +92,22 @@ function handlePlayoutSSE(request: Request): Response {
         }
       };
 
-      // Register client and get ID
-      clientId = browserPlayout.addClient(sendEvent);
+      // Register client and get ID (optionally restoring from disconnected pool)
+      const result = browserPlayout.addClient(sendEvent, requestedClientId);
+      clientId = result.clientId;
 
-      // Send initial connection message with client ID
-      controller.enqueue(encoder.encode(`event: connected\ndata: ${JSON.stringify({ connected: true, clientId })}\n\n`));
+      // Send initial connection message with client ID and restoration status
+      const connectionData = {
+        connected: true,
+        clientId,
+        restored: result.restored,
+        ...(result.restored && result.status ? {
+          currentItem: result.status.currentItem,
+          playlist: result.status.playlist,
+          state: result.status.state,
+        } : {}),
+      };
+      controller.enqueue(encoder.encode(`event: connected\ndata: ${JSON.stringify(connectionData)}\n\n`));
 
       // Handle client disconnect
       request.signal.addEventListener("abort", () => {

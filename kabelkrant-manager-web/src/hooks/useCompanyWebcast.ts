@@ -15,6 +15,8 @@ interface UseCompanyWebcastOptions {
   itemKey: number;
   /** Callback when the stream ends (video ended or live stream finished) */
   onStreamEnded?: () => void;
+  /** Callback when the stream actually starts playing */
+  onPlayingStarted?: () => void;
 }
 
 interface UseCompanyWebcastReturn {
@@ -26,7 +28,7 @@ interface UseCompanyWebcastReturn {
  * Hook to manage CompanyWebcast player for raadsvergadering streams.
  * Uses direct iframe without SDK for better autoplay control.
  */
-export function useCompanyWebcast({ containerRef, currentRaadsvergadering, state, itemKey, onStreamEnded }: UseCompanyWebcastOptions): UseCompanyWebcastReturn {
+export function useCompanyWebcast({ containerRef, currentRaadsvergadering, state, itemKey, onStreamEnded, onPlayingStarted }: UseCompanyWebcastOptions): UseCompanyWebcastReturn {
   const playerRef = useRef<CwcPlayer | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -36,12 +38,19 @@ export function useCompanyWebcast({ containerRef, currentRaadsvergadering, state
     onStreamEnded?.();
   }, [onStreamEnded]);
 
+  // Stable callback reference for playing started
+  const handlePlayingStarted = useCallback(() => {
+    console.log("[CompanyWebcast] Playing started, calling onPlayingStarted callback");
+    onPlayingStarted?.();
+  }, [onPlayingStarted]);
+
   // Handle player creation and cleanup
   useEffect(() => {
     const container = containerRef.current;
 
-    // Cleanup when not showing raadsvergadering
-    if (!currentRaadsvergadering || state !== "raadsvergadering" || !container) {
+    // Cleanup when not showing raadsvergadering (check for both waiting and playing states)
+    const isRaadsvergaderingState = state === "raadsvergadering:waiting" || state === "raadsvergadering:playing";
+    if (!currentRaadsvergadering || !isRaadsvergaderingState || !container) {
       if (iframeRef.current && container) {
         container.innerHTML = "";
         iframeRef.current = null;
@@ -97,7 +106,11 @@ export function useCompanyWebcast({ containerRef, currentRaadsvergadering, state
         case "playpause.state:change":
           console.log("[CompanyWebcast] Play state:", data.data?.state);
           // Possible states: playing, paused, ended, waiting, idle
-          if (data.data?.state === "ended") {
+          if (data.data?.state === "playing") {
+            console.log("[CompanyWebcast] Video started playing");
+            // Notify parent component that playing has started
+            handlePlayingStarted();
+          } else if (data.data?.state === "ended") {
             console.log("[CompanyWebcast] Video ended, closing iframe");
             // Clean up iframe
             if (container && iframeRef.current) {
@@ -161,7 +174,7 @@ export function useCompanyWebcast({ containerRef, currentRaadsvergadering, state
       iframeRef.current = null;
       playerRef.current = null;
     };
-  }, [currentRaadsvergadering, state, itemKey, containerRef, handleStreamEnded]);
+  }, [currentRaadsvergadering, state, itemKey, containerRef, handleStreamEnded, handlePlayingStarted]);
 
   return { playerRef };
 }

@@ -29,7 +29,7 @@ function PlayoutPage() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // SSE connection and playlist state management
-  const { clientId, currentVideo, currentIframe, currentRaadsvergadering, playlist, state, itemKey, handleItemEnded } = usePlayoutSSE();
+  const { clientId, currentVideo, currentIframe, currentRaadsvergadering, playlist, state, itemKey, handleItemEnded, handleRaadsvergaderingPlaying } = usePlayoutSSE();
 
   // Fetch settings
   const { data: settings } = useQuery<PlayoutSettings>({
@@ -59,6 +59,7 @@ function PlayoutPage() {
     state,
     itemKey,
     onStreamEnded: handleItemEnded,
+    onPlayingStarted: handleRaadsvergaderingPlaying,
   });
 
   // Audio management
