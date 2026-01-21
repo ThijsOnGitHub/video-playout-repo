@@ -431,7 +431,7 @@ export const ProgramForm: React.FC<ProgramFormProps> = ({ value, onSubmit }) => 
                 [
                   ...currentScheduledDates,
                   {
-                    id: crypto.randomUUID(),
+                    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
                     dateTime: stream.scheduledStart,
                     note: `Raadsvergadering: ${stream.title}`,
                   },
