@@ -56,32 +56,6 @@ export const ProgramForm: React.FC<ProgramFormProps> = ({ value, onSubmit }) => 
   // Track the current program ID to detect when switching programs
   const currentProgramIdRef = useRef<string>(value.id);
 
-  // Reset form and history only when switching to a DIFFERENT program
-  useEffect(() => {
-    // Only reset if we switched to a different program
-    if (value.id !== currentProgramIdRef.current) {
-      // Cancel any pending autosave when switching programs
-      if (autosaveTimerRef.current) {
-        clearTimeout(autosaveTimerRef.current);
-        autosaveTimerRef.current = null;
-      }
-      pendingDataRef.current = null;
-
-      currentProgramIdRef.current = value.id;
-      isInternalUpdateRef.current = true;
-      lastFormValueRef.current = JSON.stringify(value);
-      setSaveStatus("idle");
-      setTimeout(() => {
-        reset(value);
-        resetHistory(value);
-        // Allow watch to trigger again after a short delay
-        setTimeout(() => {
-          isInternalUpdateRef.current = false;
-        }, 50);
-      }, 1);
-    }
-  }, [value.id, reset, resetHistory]);
-
   // Apply history value to form when undo/redo happens
   useEffect(() => {
     if (historyValue && historyValue.id === value.id) {
@@ -148,14 +122,6 @@ export const ProgramForm: React.FC<ProgramFormProps> = ({ value, onSubmit }) => 
     [] // No dependencies needed since we use refs
   );
 
-  // Cleanup autosave timer on unmount
-  useEffect(() => {
-    return () => {
-      if (autosaveTimerRef.current) {
-        clearTimeout(autosaveTimerRef.current);
-      }
-    };
-  }, []);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
