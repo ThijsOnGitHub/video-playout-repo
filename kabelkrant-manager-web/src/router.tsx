@@ -8,7 +8,7 @@ export function getRouter() {
     scrollRestoration: true,
   });
 
-  if (!router.isServer) {
+  if (!router.isServer && import.meta.env.PROD) {
     Sentry.init({
       dsn: "https://dd65257854a3a1d4c2605a5bbf0dcb5c@o4510744023531520.ingest.de.sentry.io/4510744025235536",
 
