@@ -51,98 +51,75 @@ export const ProgramForm: React.FC<ProgramFormProps> = ({ value, onSubmit }) => 
   }, [onSubmit]);
 
   // Undo/Redo history
-  const { value: historyValue, setValue: addToHistory, undo, redo, canUndo, canRedo, reset: resetHistory } = useUndoRedo<ProgramFormSchema>(value, { debounceMs: 300, maxHistorySize: 50 });
+  const { setValue: addToHistory, undo, redo, canUndo, canRedo } = useUndoRedo<ProgramFormSchema>(value, { debounceMs: 300, maxHistorySize: 50 });
 
-  // Track the current program ID to detect when switching programs
-  const currentProgramIdRef = useRef<string>(value.id);
-
-  // Apply history value to form when undo/redo happens
-  useEffect(() => {
-    if (historyValue && historyValue.id === value.id) {
-      const historyJson = JSON.stringify(historyValue);
-      // Only apply if different from current form value
-      if (historyJson !== lastFormValueRef.current) {
-        isInternalUpdateRef.current = true;
-        lastFormValueRef.current = historyJson;
-        reset(historyValue);
-        // Trigger autosave after undo/redo
-        triggerAutosave(historyValue);
-        setTimeout(() => {
-          isInternalUpdateRef.current = false;
-        }, 50);
-      }
+  const triggerAutosave = useCallback((data: ProgramFormSchema) => {
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
     }
-  }, [historyValue]);
+    pendingDataRef.current = data;
+    setSaveStatus("saving");
+    autosaveTimerRef.current = setTimeout(() => {
+      const dataToSave = pendingDataRef.current;
+      if (dataToSave) {
+        onSubmitRef.current(dataToSave);
+        pendingDataRef.current = null;
+      }
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 1500);
+    }, AUTOSAVE_DELAY);
+  }, []);
+
+  const applyHistoryValue = useCallback((newValue: ProgramFormSchema | undefined) => {
+    if (newValue && newValue.id === value.id) {
+      isInternalUpdateRef.current = true;
+      lastFormValueRef.current = JSON.stringify(newValue);
+      reset(newValue);
+      triggerAutosave(newValue);
+      setTimeout(() => {
+        isInternalUpdateRef.current = false;
+      }, 50);
+    }
+  }, [value.id, reset, triggerAutosave]);
+
+  const handleUndo = useCallback(() => {
+    applyHistoryValue(undo());
+  }, [undo, applyHistoryValue]);
+
+  const handleRedo = useCallback(() => {
+    applyHistoryValue(redo());
+  }, [redo, applyHistoryValue]);
 
   // Watch form changes and add to history + autosave
   useEffect(() => {
     const subscription = watch((formData) => {
-      if (!formData || isInternalUpdateRef.current) {
-        return;
-      }
+      if (!formData || isInternalUpdateRef.current) return;
       const data = formData as ProgramFormSchema;
       const dataJson = JSON.stringify(data);
-
-      // Only trigger if data actually changed from the last form value
       if (dataJson !== lastFormValueRef.current) {
         lastFormValueRef.current = dataJson;
-        // Add to history
         addToHistory(data);
-        // Trigger autosave
         triggerAutosave(data);
       }
     });
     return () => subscription.unsubscribe();
-  }, [watch, addToHistory]);
-
-  const triggerAutosave = useCallback(
-    (data: ProgramFormSchema) => {
-      // Clear existing timer
-      if (autosaveTimerRef.current) {
-        clearTimeout(autosaveTimerRef.current);
-      }
-
-      // Store the latest data in ref to avoid stale closure
-      pendingDataRef.current = data;
-      setSaveStatus("saving");
-
-      // Set new timer for autosave
-      autosaveTimerRef.current = setTimeout(() => {
-        // Use the latest data from ref, not the closure
-        const dataToSave = pendingDataRef.current;
-        if (dataToSave) {
-          onSubmitRef.current(dataToSave);
-          pendingDataRef.current = null;
-        }
-        setSaveStatus("saved");
-        // Reset status after a short delay
-        setTimeout(() => setSaveStatus("idle"), 1500);
-      }, AUTOSAVE_DELAY);
-    },
-    [] // No dependencies needed since we use refs
-  );
-
+  }, [watch, addToHistory, triggerAutosave]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "z") {
         e.preventDefault();
-        if (e.shiftKey) {
-          redo();
-        } else {
-          undo();
-        }
+        e.shiftKey ? handleRedo() : handleUndo();
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "y") {
         e.preventDefault();
-        redo();
+        handleRedo();
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undo, redo]);
+  }, [handleUndo, handleRedo]);
 
   const { fields, append, remove } = useFieldArray({
     name: "planning",
@@ -164,10 +141,10 @@ export const ProgramForm: React.FC<ProgramFormProps> = ({ value, onSubmit }) => 
       {/* Toolbar with undo/redo and save status */}
       <div className="flex items-center justify-between gap-2 border-b pb-3">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={undo} disabled={!canUndo} title="Ongedaan maken (Ctrl+Z)">
+          <Button variant="outline" size="sm" onClick={handleUndo} disabled={!canUndo} title="Ongedaan maken (Ctrl+Z)">
             <Undo2 className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={redo} disabled={!canRedo} title="Opnieuw (Ctrl+Shift+Z)">
+          <Button variant="outline" size="sm" onClick={handleRedo} disabled={!canRedo} title="Opnieuw (Ctrl+Shift+Z)">
             <Redo2 className="h-4 w-4" />
           </Button>
         </div>

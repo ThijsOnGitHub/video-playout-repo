@@ -11,10 +11,10 @@ export interface UseUndoRedoReturn<T> {
   value: T;
   /** Set value and add to history */
   setValue: (newValue: T) => void;
-  /** Undo to previous state */
-  undo: () => void;
-  /** Redo to next state */
-  redo: () => void;
+  /** Undo to previous state, returns new value or undefined if can't undo */
+  undo: () => T | undefined;
+  /** Redo to next state, returns new value or undefined if can't redo */
+  redo: () => T | undefined;
   /** Check if undo is available */
   canUndo: boolean;
   /** Check if redo is available */
@@ -87,25 +87,35 @@ export function useUndoRedo<T>(initialValue: T, options: UseUndoRedoOptions<T> =
     [maxHistorySize, debounceMs]
   );
 
-  const undo = useCallback(() => {
-    // Clear any pending debounce to prevent overwriting
+  const undo = useCallback((): T | undefined => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
     }
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : prev));
+    const idx = currentIndexRef.current;
+    if (idx > 0) {
+      const newIndex = idx - 1;
+      setCurrentIndex(newIndex);
+      currentIndexRef.current = newIndex;
+      return historyRef.current[newIndex];
+    }
+    return undefined;
   }, []);
 
-  const redo = useCallback(() => {
-    // Clear any pending debounce to prevent overwriting
+  const redo = useCallback((): T | undefined => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
     }
-    setCurrentIndex((prev) => {
-      const hist = historyRef.current;
-      return prev < hist.length - 1 ? prev + 1 : prev;
-    });
+    const idx = currentIndexRef.current;
+    const hist = historyRef.current;
+    if (idx < hist.length - 1) {
+      const newIndex = idx + 1;
+      setCurrentIndex(newIndex);
+      currentIndexRef.current = newIndex;
+      return hist[newIndex];
+    }
+    return undefined;
   }, []);
 
   const reset = useCallback((newValue: T) => {
