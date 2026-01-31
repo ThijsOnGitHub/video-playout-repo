@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { Readable } from "stream";
 import { type BrowserPlayoutEvent, type AdminStatusEvent, type BrowserPlayout } from "./services/browserPlayout";
 import { getServices } from "./init";
 
@@ -426,17 +427,23 @@ async function handleVideoUpload(request: Request): Promise<Response> {
     const filePath = path.join(absolutePath, newFileName);
 
     // Stream the file to disk (memory efficient)
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    fs.writeFileSync(filePath, buffer);
+    const writeStream = fs.createWriteStream(filePath);
+    const readable = Readable.fromWeb(file.stream() as import("stream/web").ReadableStream);
 
-    console.log(`[Upload] File saved: ${filePath} (${buffer.length} bytes)`);
+    await new Promise<void>((resolve, reject) => {
+      readable.pipe(writeStream);
+      writeStream.on("finish", resolve);
+      writeStream.on("error", reject);
+      readable.on("error", reject);
+    });
+
+    console.log(`[Upload] File saved: ${filePath} (${file.size} bytes)`);
 
     return new Response(
       JSON.stringify({
         success: true,
         fileName: newFileName,
-        size: buffer.length,
+        size: file.size,
       }),
       {
         headers: { "Content-Type": "application/json" },
