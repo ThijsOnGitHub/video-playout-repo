@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install all dependencies (including dev for build)
-RUN npm install
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -28,7 +28,6 @@ RUN mkdir -p /app/data /videos
 
 # Copy built application (Nitro outputs to .output/)
 COPY --from=builder /app/.output ./.output
-COPY --from=builder /app/package.json .
 
 # Set environment variables
 ENV NODE_ENV=production
