@@ -365,25 +365,30 @@ function getMimeType(filePath: string): string {
 }
 
 /**
- * Handle video file upload using streams (memory efficient for large files)
+ * Handle video file upload using raw binary streaming (memory efficient for large files).
+ * Expects:
+ * - Content-Type: application/octet-stream
+ * - X-Folder-Path header: URL-encoded folder path
+ * - X-Filename header: URL-encoded original filename
+ * - Body: raw file data
  */
 async function handleVideoUpload(request: Request): Promise<Response> {
   try {
     const contentType = request.headers.get("content-type") || "";
 
-    if (!contentType.includes("multipart/form-data")) {
-      return new Response(JSON.stringify({ error: "Content-Type must be multipart/form-data" }), {
+    if (!contentType.includes("application/octet-stream")) {
+      return new Response(JSON.stringify({ error: "Content-Type must be application/octet-stream" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    const folderPath = formData.get("folderPath") as string | null;
+    // Read metadata from headers
+    const folderPath = decodeURIComponent(request.headers.get("x-folder-path") || "");
+    const originalFilename = decodeURIComponent(request.headers.get("x-filename") || "");
 
-    if (!file || !folderPath) {
-      return new Response(JSON.stringify({ error: "Missing file or folderPath" }), {
+    if (!folderPath || !originalFilename || !request.body) {
+      return new Response(JSON.stringify({ error: "Missing required headers (X-Folder-Path, X-Filename) or body" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
@@ -421,14 +426,14 @@ async function handleVideoUpload(request: Request): Promise<Response> {
     }
 
     // Clean the filename and add numeric prefix
-    const cleanFileName = file.name.replace(/^\d+[_\-\s]+/, ""); // Remove existing prefix
+    const cleanFileName = originalFilename.replace(/^\d+[_\-\s]+/, ""); // Remove existing prefix
     const paddedIndex = String(maxNumber + 1).padStart(2, "0");
     const newFileName = `${paddedIndex}_${cleanFileName}`;
     const filePath = path.join(absolutePath, newFileName);
 
-    // Stream the file to disk (memory efficient)
+    // Stream request body directly to disk (memory efficient)
     const writeStream = fs.createWriteStream(filePath);
-    const readable = Readable.fromWeb(file.stream() as import("stream/web").ReadableStream);
+    const readable = Readable.fromWeb(request.body as import("stream/web").ReadableStream);
 
     await new Promise<void>((resolve, reject) => {
       readable.pipe(writeStream);
@@ -437,13 +442,16 @@ async function handleVideoUpload(request: Request): Promise<Response> {
       readable.on("error", reject);
     });
 
-    console.log(`[Upload] File saved: ${filePath} (${file.size} bytes)`);
+    // Get file size from Content-Length header
+    const fileSize = parseInt(request.headers.get("content-length") || "0", 10);
+
+    console.log(`[Upload] File saved: ${filePath} (${fileSize} bytes)`);
 
     return new Response(
       JSON.stringify({
         success: true,
         fileName: newFileName,
-        size: file.size,
+        size: fileSize,
       }),
       {
         headers: { "Content-Type": "application/json" },

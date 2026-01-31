@@ -16,14 +16,12 @@ interface UseVideoUploadReturn {
 }
 
 /**
- * Upload a single file using XMLHttpRequest for progress tracking
+ * Upload a single file using XMLHttpRequest for progress tracking.
+ * Uses raw binary body with metadata in headers for memory-efficient streaming.
  */
 function uploadFileWithProgress(file: File, folderPath: string, onProgress: (progress: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("folderPath", folderPath);
 
     xhr.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable) {
@@ -45,7 +43,11 @@ function uploadFileWithProgress(file: File, folderPath: string, onProgress: (pro
     });
 
     xhr.open("POST", "/api/upload");
-    xhr.send(formData);
+    // Send metadata in headers, file as raw binary body
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.setRequestHeader("X-Folder-Path", encodeURIComponent(folderPath));
+    xhr.setRequestHeader("X-Filename", encodeURIComponent(file.name));
+    xhr.send(file);
   });
 }
 
