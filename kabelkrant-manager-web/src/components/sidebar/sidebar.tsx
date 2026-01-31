@@ -37,7 +37,7 @@ export interface SidebarProps {
 
 export const Sidebar: FC<SidebarProps> = ({ items }) => {
   return (
-    <aside className="w-[280px] min-w-[280px] h-[calc(100dvh-50px)] bg-white border-r border-gray-200 p-4 overflow-y-auto">
+    <aside className="w-[280px] min-w-[280px] h-[calc(100dvh-50px)] bg-white border-r border-gray-200 p-4 overflow-y-auto sticky top-[50px] self-start">
       <nav className="flex flex-col gap-6">
         {Object.entries(items).map(([category, categoryItems]) => (
           <section key={category} className="flex flex-col gap-1.5">
