@@ -8,6 +8,8 @@ const mimeTypes: Record<string, string> = {
   ".mov": "video/quicktime",
   ".wmv": "video/x-ms-wmv",
   ".flv": "video/x-flv",
+  ".mpg": "video/mpeg",
+  ".mpeg": "video/mpeg",
 };
 
 /**
