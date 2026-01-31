@@ -4,8 +4,7 @@ import type { VideoItems } from "@/lib/types/VideoItem";
 import type { FilesWithMetadata, VideoFile } from "@/lib/types/FileMetaTypes";
 import type { PlayoutSettings } from "@/lib/types/PlayoutSettings";
 import { DEFAULT_PLAYOUT_SETTINGS } from "@/lib/types/PlayoutSettings";
-
-const VIDEO_EXTENSIONS = [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"];
+import { isVideoFile } from "@/server/helpers/mime";
 
 export class FileStorage {
   private readonly basePath: string;
@@ -86,7 +85,7 @@ export class FileStorage {
 
       if (stat.isFile()) {
         const extension = path.extname(file).toLowerCase();
-        const isVideo = VIDEO_EXTENSIONS.includes(extension);
+        const isVideo = isVideoFile(file);
 
         if (isVideo) {
           let duration: number | undefined;

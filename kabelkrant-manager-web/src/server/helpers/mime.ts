@@ -21,6 +21,13 @@ const mimeTypes: Record<string, string> = {
   ".asf": "video/x-ms-asf",
 };
 
+export const VIDEO_EXTENSIONS = Object.keys(mimeTypes);
+
+export function isVideoFile(fileName: string): boolean {
+  const ext = path.extname(fileName).toLowerCase();
+  return VIDEO_EXTENSIONS.includes(ext);
+}
+
 /**
  * Get MIME type for video files
  */

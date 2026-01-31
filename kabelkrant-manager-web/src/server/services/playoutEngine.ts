@@ -8,8 +8,7 @@ import type { FileStorage } from "./fileStorage";
 import type { VideoPlaylist } from "./videoPlaylist";
 import type { BrowserPlayout } from "./browserPlayout";
 import type { ScheduledDate } from "@/lib/schemas/program";
-
-const VIDEO_EXTENSIONS = [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"];
+import { isVideoFile } from "@/server/helpers/mime";
 
 export interface PlayoutTarget {
   addVideos(videos: string[]): Promise<void>;
@@ -127,11 +126,6 @@ export class PlayoutEngine {
     return selectedFile.filePath;
   }
 
-  private isVideoFile(fileName: string): boolean {
-    const extension = path.extname(fileName).toLowerCase();
-    return VIDEO_EXTENSIONS.includes(extension);
-  }
-
   playVideoItem(videoItem: VideoItem) {
     // Check if this is an iframe program
     if (videoItem.programType === "iframe") {
@@ -159,7 +153,7 @@ export class PlayoutEngine {
 
     const fileNames = fs
       .readdirSync(fullPath)
-      .filter((file) => this.isVideoFile(file))
+      .filter((file) => isVideoFile(file))
       .sort(sortFilesWithNumbers);
 
     if (fileNames.length === 0) {
