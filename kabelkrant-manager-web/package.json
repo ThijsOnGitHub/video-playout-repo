@@ -49,6 +49,8 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@tanstack/react-query-devtools": "5.91.3",
+    "@tanstack/react-router-devtools": "1.157.18",
     "@types/node": "^20.8.0",
     "@types/node-cron": "^3.0.8",
     "@types/react": "^18.3.0",
