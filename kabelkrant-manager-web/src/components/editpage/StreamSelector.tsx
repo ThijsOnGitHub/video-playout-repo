@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, Calendar, Info, Check } from "lucide-react";
+import { RefreshCw, Calendar, Check, AlertTriangle } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { getCompanyWebcastStreams, getCompanyWebcastPlayerId } from "@/server/functions/companywebcast";
 import { cn } from "@/lib/utils";
@@ -26,10 +26,12 @@ interface StreamSelectorProps {
   }) => void;
   currentWebcastId?: string;
   customer?: string;
+  existingWebcastCodes?: string[];
 }
 
-export function StreamSelector({ onStreamSelect, currentWebcastId, customer = "gemeentekrimpenerwaard" }: StreamSelectorProps) {
+export function StreamSelector({ onStreamSelect, currentWebcastId, customer = "gemeentekrimpenerwaard", existingWebcastCodes = [] }: StreamSelectorProps) {
   const [selectedStreamId, setSelectedStreamId] = useState<string | undefined>(currentWebcastId);
+  const existingCodesSet = new Set(existingWebcastCodes);
 
   // Use TanStack Query to fetch streams
   const {
@@ -128,6 +130,7 @@ export function StreamSelector({ onStreamSelect, currentWebcastId, customer = "g
             {streams.map((stream: CompanyWebcastStream) => {
               const scheduledDate = parseScheduledStart(stream.scheduledStart);
               const isSelected = selectedStreamId === stream.id;
+              const isAlreadyAdded = existingCodesSet.has(stream.webcastCode);
 
               return (
                 <button
@@ -137,7 +140,8 @@ export function StreamSelector({ onStreamSelect, currentWebcastId, customer = "g
                   className={cn(
                     "w-full text-left p-3 rounded-lg border-2 transition-colors",
                     "hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed",
-                    isSelected ? "border-primary bg-primary/5" : "border-border"
+                    isSelected ? "border-primary bg-primary/5" : "border-border",
+                    isAlreadyAdded && "border-amber-400 bg-amber-50"
                   )}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -145,6 +149,12 @@ export function StreamSelector({ onStreamSelect, currentWebcastId, customer = "g
                       <div className="font-medium flex items-center gap-2">
                         {stream.title}
                         {isSelected && <Check className="h-4 w-4 text-primary flex-shrink-0" />}
+                        {isAlreadyAdded && (
+                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-amber-200 text-amber-800 rounded">
+                            <AlertTriangle className="h-3 w-3" />
+                            Al toegevoegd
+                          </span>
+                        )}
                       </div>
                       {scheduledDate && (
                         <div className="text-sm text-muted-foreground mt-1">

@@ -16,6 +16,7 @@ export type SidebarItemProgram = {
   onClick: () => void;
   onDelete?: () => void;
   icon?: LucideIcon;
+  subtitle?: string;
 };
 
 export type SidebarItemButton = {
@@ -52,7 +53,7 @@ export const Sidebar: FC<SidebarProps> = ({ items }) => {
               }
               if (item.type === SidebarItemTypes.PROGRAM) {
                 return (
-                  <SidebarItem key={item.value.id} onDelete={item.onDelete} showDelete={item.onDelete != null} onClick={item.onClick} isSelected={item.isSelected} icon={item.icon}>
+                  <SidebarItem key={item.value.id} onDelete={item.onDelete} showDelete={item.onDelete != null} onClick={item.onClick} isSelected={item.isSelected} icon={item.icon} subtitle={item.subtitle}>
                     {item.value.programName}
                   </SidebarItem>
                 );

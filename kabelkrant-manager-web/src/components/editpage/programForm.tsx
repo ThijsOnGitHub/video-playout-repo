@@ -18,7 +18,7 @@ import { playVideoItem } from "@/server/functions/obs";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { VideoManager } from "./VideoManager";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { StreamSelector } from "./StreamSelector";
+import { ExternalLink } from "lucide-react";
 import { useProgramsContext } from "@/contexts/ProgramsContext";
 
 export interface ProgramFormProps {
@@ -340,58 +340,44 @@ export const ProgramForm: React.FC<ProgramFormProps> = ({ value, onSubmit }) => 
         </CardContent>
       </Card>
 
-      {/* Stream Selector - alleen voor raadsvergadering type */}
-      {programType === "raadsvergadering" && (
-        <StreamSelector
-          currentWebcastId={watch("webcastId")}
-          onStreamSelect={(stream) => {
-            // Prevent triggering watch/autosave multiple times
-            isInternalUpdateRef.current = true;
-
-            // Set webcast information and program name
-            setValue("programName", stream.title, { shouldValidate: false });
-            setValue("webcastId", stream.webcastId, { shouldValidate: false });
-            setValue("webcastCode", stream.webcastCode, { shouldValidate: false });
-
-            // Add scheduled date for this stream
-            const currentScheduledDates = watch("scheduledDates") || [];
-
-            // Check if there's already a scheduled date for this stream
-            const existingIndex = currentScheduledDates.findIndex((sd) => sd.note === `Raadsvergadering: ${stream.title}`);
-
-            if (existingIndex >= 0) {
-              // Update existing scheduled date
-              const updatedDates = [...currentScheduledDates];
-              updatedDates[existingIndex] = {
-                ...updatedDates[existingIndex],
-                dateTime: stream.scheduledStart,
-              };
-              setValue("scheduledDates", updatedDates, { shouldValidate: false });
-            } else {
-              // Add new scheduled date
-              setValue(
-                "scheduledDates",
-                [
-                  ...currentScheduledDates,
-                  {
-                    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                    dateTime: stream.scheduledStart,
-                    note: `Raadsvergadering: ${stream.title}`,
-                  },
-                ],
-                { shouldValidate: false }
-              );
-            }
-
-            // Re-enable watch after a short delay and trigger single autosave
-            setTimeout(() => {
-              isInternalUpdateRef.current = false;
-              // Manually trigger one autosave with all the changes
-              const formData = watch();
-              triggerAutosave(formData as ProgramFormSchema);
-            }, 50);
-          }}
-        />
+      {/* Webcast Info - alleen voor raadsvergadering type */}
+      {programType === "raadsvergadering" && watch("webcastId") && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Video className="h-5 w-5" />
+              Webcast Informatie
+            </CardTitle>
+            <CardDescription>
+              Gegevens van de gekoppelde CompanyWebcast stream
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <div className="grid grid-cols-[120px_1fr] gap-2 text-sm">
+              <span className="font-medium text-muted-foreground">Webcast ID:</span>
+              <code className="bg-muted px-2 py-1 rounded text-xs break-all">{watch("webcastId")}</code>
+            </div>
+            {watch("webcastCode") && (
+              <div className="grid grid-cols-[120px_1fr] gap-2 text-sm">
+                <span className="font-medium text-muted-foreground">Webcast Code:</span>
+                <code className="bg-muted px-2 py-1 rounded text-xs">{watch("webcastCode")}</code>
+              </div>
+            )}
+            {watch("webcastCode") && (
+              <div className="pt-2">
+                <a
+                  href={`https://channel.royalcast.com/${watch("webcastCode")?.split("/")[0]}/#!/${watch("webcastCode")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Bekijk op Royalcast
+                </a>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Video Manager Component - alleen voor video type */}

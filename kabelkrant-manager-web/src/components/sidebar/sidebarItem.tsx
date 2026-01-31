@@ -9,6 +9,7 @@ export interface SidebarItemProps {
   isAdd?: boolean;
   isSelected?: boolean;
   children?: ReactNode;
+  subtitle?: string;
   showDelete?: boolean;
   onDelete?: () => void;
   icon?: LucideIcon;
@@ -17,6 +18,7 @@ export interface SidebarItemProps {
 export const SidebarItem: FC<SidebarItemProps & DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>> = ({
   isSelected = false,
   children,
+  subtitle,
   isAdd = false,
   showDelete = false,
   onDelete,
@@ -42,11 +44,18 @@ export const SidebarItem: FC<SidebarItemProps & DetailedHTMLProps<HTMLAttributes
         )}
       >
         {isAdd && !Icon && <Plus className="h-4 w-4 flex-shrink-0" />}
-        {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
-        <span className="flex-1 truncate">{children}</span>
+        {Icon && <Icon className={cn("h-4 w-4 flex-shrink-0", subtitle && "self-start mt-0.5")} />}
+        <div className="flex-1 min-w-0">
+          <span className="block truncate">{children}</span>
+          {subtitle && (
+            <span className={cn("block text-xs truncate", isSelected ? "text-white/70" : "text-gray-500")}>
+              {subtitle}
+            </span>
+          )}
+        </div>
         {showDelete && (
           <Trash2
-            className="h-4 w-4 flex-shrink-0 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+            className={cn("h-4 w-4 flex-shrink-0 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity", subtitle && "self-start mt-0.5")}
             onClick={(e) => {
               e.stopPropagation();
               setShowDeleteDialog(true);
