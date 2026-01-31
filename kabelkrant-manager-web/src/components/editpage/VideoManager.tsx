@@ -1,12 +1,12 @@
+import { useRef } from "react";
 import { Upload } from "lucide-react";
 import { CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from "@dnd-kit/sortable";
 import { SortableVideoCard } from "./SortableVideoCard";
-import { UploadProgress } from "./UploadProgress";
 import { useVideoFiles } from "@/hooks/useVideoFiles";
-import { useVideoUpload } from "@/hooks/useVideoUpload";
+import { useUploadContext } from "@/contexts/UploadContext";
 
 export interface VideoManagerProps {
   folderPath: string | undefined;
@@ -16,12 +16,20 @@ export const VideoManager: React.FC<VideoManagerProps> = ({ folderPath }) => {
   // Video files management
   const { files, isLoading, isDeleting, isReordering, isBusy: isFilesBusy, deleteFile, handleDragEnd, invalidateFiles } = useVideoFiles({ folderPath });
 
-  // Video upload
-  const { isUploading, uploadProgress, fileInputRef, handleFileInputChange } = useVideoUpload({
-    folderPath,
-    onSuccess: invalidateFiles,
-    onError: () => alert("Fout bij uploaden van video"),
-  });
+  // Video upload via global context
+  const { uploadFiles, hasActiveUploads } = useUploadContext();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files && folderPath) {
+      uploadFiles(files, folderPath, invalidateFiles);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   // DnD sensors
   const sensors = useSensors(
@@ -35,7 +43,7 @@ export const VideoManager: React.FC<VideoManagerProps> = ({ folderPath }) => {
     })
   );
 
-  const isBusy = isUploading || isFilesBusy;
+  const isBusy = hasActiveUploads || isFilesBusy;
 
   return (
     <div className="flex flex-col gap-4">
@@ -46,14 +54,11 @@ export const VideoManager: React.FC<VideoManagerProps> = ({ folderPath }) => {
             <input ref={fileInputRef} type="file" accept="video/*" multiple onChange={handleFileInputChange} className="hidden" id="video-upload" />
             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isBusy}>
               <Upload className="h-4 w-4 mr-2" />
-              {isUploading ? "Uploaden..." : "Video uploaden"}
+              Video uploaden
             </Button>
           </div>
         )}
       </div>
-
-      {/* Upload Progress Indicator */}
-      {uploadProgress && <UploadProgress progress={uploadProgress} />}
 
       {isLoading && <div className="text-center text-muted-foreground py-8">Video's laden...</div>}
 

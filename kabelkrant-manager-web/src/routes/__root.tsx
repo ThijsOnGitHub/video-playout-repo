@@ -2,6 +2,8 @@
 import { Outlet, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { UploadProvider } from "@/contexts/UploadContext";
+import { GlobalUploadIndicator } from "@/components/upload";
 import "@/styles/globals.css";
 
 const queryClient = new QueryClient({
@@ -35,7 +37,10 @@ function RootComponent() {
   return (
     <RootDocument>
       <QueryClientProvider client={queryClient}>
-        <Outlet />
+        <UploadProvider>
+          <Outlet />
+          <GlobalUploadIndicator />
+        </UploadProvider>
       </QueryClientProvider>
     </RootDocument>
   );
