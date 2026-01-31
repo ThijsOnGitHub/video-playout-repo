@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getFileStorage } from "../services/fileStorage";
 import { getBrowserPlayout, type ClientStatus } from "../services/browserPlayout";
 import type { PlayoutSettings } from "@/lib/types/PlayoutSettings";
+import { getServices, stopServices, initializeServer } from "../init";
 
 const playoutSettingsSchema = z.object({
   kabelkrantUrl: z.string(),
@@ -94,3 +95,24 @@ export const forceStartStream = createServerFn({ method: "POST" })
     const success = browserPlayout.forceStartStream(data.clientId);
     return { success };
   });
+
+// Dev-only: Reload server services
+export const reloadServices = createServerFn({ method: "GET" }).handler(async () => {
+  if (process.env.NODE_ENV === "production") {
+    return { success: false, message: "Not available in production" };
+  }
+
+  console.log("[Dev] Reloading services...");
+
+  try {
+    const services = getServices();
+    stopServices(services);
+    (globalThis as Record<string, unknown>).__kabelkrant_services = undefined;
+  } catch {
+    // Services might not be initialized yet
+  }
+
+  await initializeServer();
+
+  return { success: true, message: "Services reloaded" };
+});
