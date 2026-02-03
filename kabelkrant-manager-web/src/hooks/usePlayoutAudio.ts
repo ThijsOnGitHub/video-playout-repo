@@ -100,7 +100,14 @@ export function usePlayoutAudio({ settings, isActivated, state, videoRef, iframe
   // Setup microphone audio passthrough with gain control
   const setupMicrophone = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Request microphone WITHOUT audio processing (causes robotic distortion)
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
       mediaStreamRef.current = stream;
       audioContextRef.current = new AudioContext();
 
